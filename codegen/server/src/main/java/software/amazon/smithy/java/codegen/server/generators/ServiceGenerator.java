@@ -17,9 +17,9 @@ import software.amazon.smithy.java.codegen.generators.IdStringGenerator;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.server.ServerSymbolProperties;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
-import software.amazon.smithy.java.server.core.Operation;
-import software.amazon.smithy.java.server.core.Service;
-import software.amazon.smithy.java.server.core.exceptions.UnknownOperationException;
+import software.amazon.smithy.java.server.Operation;
+import software.amazon.smithy.java.server.Service;
+import software.amazon.smithy.java.server.exceptions.UnknownOperationException;
 import software.amazon.smithy.model.knowledge.TopDownIndex;
 import software.amazon.smithy.model.shapes.ServiceShape;
 

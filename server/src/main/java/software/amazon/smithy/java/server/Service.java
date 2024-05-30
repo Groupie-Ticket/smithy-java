@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.server.core;
+package software.amazon.smithy.java.server;
 
 public interface Service {
 

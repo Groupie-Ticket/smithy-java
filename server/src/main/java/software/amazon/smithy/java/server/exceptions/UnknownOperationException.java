@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.server.core.exceptions;
+package software.amazon.smithy.java.server.exceptions;
 
 import software.amazon.smithy.java.runtime.core.schema.ApiException;
 

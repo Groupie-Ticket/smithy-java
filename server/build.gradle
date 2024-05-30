@@ -1,0 +1,13 @@
+plugins {
+    id 'smithy-java.module-conventions'
+}
+
+description = "This module provides the Smithy Java Server"
+
+ext {
+    displayName = "Smithy :: Java :: Server"
+    moduleName = "software.amazon.smithy.java.server"
+}
+
+dependencies {
+}

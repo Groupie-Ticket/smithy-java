@@ -1,0 +1,16 @@
+plugins {
+    id 'smithy-java.module-conventions'
+}
+
+description = "This module provides the a Netty implementation for the server"
+
+ext {
+    displayName = "Smithy :: Java :: Server Netty"
+    moduleName = "software.amazon.smithy.java.server-netty"
+}
+
+dependencies {
+    api(project(":server-core"))
+    implementation(libs.netty.codec.http)
+    implementation(libs.netty.codec.http2)
+}

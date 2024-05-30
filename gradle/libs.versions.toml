@@ -9,6 +9,7 @@ spotbugs = "6.0.9"
 spotless = "6.25.0"
 smithy-gradle = "1.0.0"
 assertj = "3.25.1"
+netty = "4.1.109.Final"
 
 [libraries]
 smithy-model = { module = "software.amazon.smithy:smithy-model", version.ref = "smithy" }
@@ -16,6 +17,9 @@ smithy-codegen = { module = "software.amazon.smithy:smithy-codegen-core", versio
 smithy-aws-traits = { module = "software.amazon.smithy:smithy-aws-traits", version.ref = "smithy" }
 
 jsoniter = { module = "com.jsoniter:jsoniter", version.ref = "jsoniter"}
+
+netty-codec-http2 = { module = "io.netty:netty-codec-http2", version.ref = "netty" }
+netty-codec-http = { module = "io.netty:netty-codec-http", version.ref = "netty" }
 
 # Test dependencies
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit5" }
