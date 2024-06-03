@@ -5,8 +5,11 @@
 
 package software.amazon.smithy.java.server;
 
-// TODO Fill with more stuff.
-public interface RequestContext {
+import java.net.URI;
 
-    String getRequestId();
+public interface ServerProvider {
+
+    String name();
+
+    ServerBuilder<?> newBuilder(URI defaultEndpoint);
 }

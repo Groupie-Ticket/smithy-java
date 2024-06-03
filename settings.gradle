@@ -40,4 +40,5 @@ include ":examples:restjson-example"
 include 'server-core'
 include 'server-netty'
 include 'server'
+include 'server-netty'
 

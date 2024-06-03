@@ -53,9 +53,9 @@ public class ServiceBuilderTest {
 
     @Test
     void testRouting() throws ExecutionException, InterruptedException {
-        Operation<GetBeerInput, CompletableFuture<GetBeerOutput>> getBeer = service.getOperation("GetBeer");
+        Operation<GetBeerInput, GetBeerOutput> getBeer = service.getOperation("GetBeer");
         assertThat("GetBeer").isEqualTo(getBeer.name());
-        var output = getBeer.function().apply(GetBeerInput.builder().id(1).build(), null);
+        var output = getBeer.asyncFunction().apply(GetBeerInput.builder().id(1).build(), null);
         assertThat(output.get().value())
             .hasSize(1)
             .containsExactly(Beer.builder().id(1).name("TestBeer").build());
