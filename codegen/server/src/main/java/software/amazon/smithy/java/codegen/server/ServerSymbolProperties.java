@@ -13,6 +13,8 @@ import software.amazon.smithy.codegen.core.Symbol;
  */
 public final class ServerSymbolProperties {
 
+    public static final Property<Symbol> SDK_OPERATION = Property.named("sdk-operation");
+
     private ServerSymbolProperties() {
 
     }

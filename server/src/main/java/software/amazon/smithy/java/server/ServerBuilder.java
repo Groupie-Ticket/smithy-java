@@ -5,8 +5,10 @@
 
 package software.amazon.smithy.java.server;
 
-// TODO Fill with more stuff.
-public interface RequestContext {
 
-    String getRequestId();
+public interface ServerBuilder<T extends ServerBuilder<T>> {
+
+    ServerBuilder<T> addService(Service service);
+
+    Server build();
 }

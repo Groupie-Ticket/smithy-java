@@ -13,6 +13,7 @@ import software.amazon.smithy.codegen.core.directed.GenerateOperationDirective;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
+import software.amazon.smithy.java.codegen.generators.OperationGenerator;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.server.ServerSymbolProperties;
 import software.amazon.smithy.java.server.RequestContext;
@@ -28,6 +29,10 @@ public class OperationInterfaceGenerator implements
         var operationMethodName = directive.symbol().getProperty(ServerSymbolProperties.OPERATION_FIELD_NAME);
         Symbol stubSymbol = directive.symbol().expectProperty(ServerSymbolProperties.STUB_OPERATION);
         Symbol asyncStubSymbol = directive.symbol().expectProperty(ServerSymbolProperties.ASYNC_STUB_OPERATION);
+        new OperationGenerator().accept(
+            directive,
+            directive.symbol().expectProperty(ServerSymbolProperties.SDK_OPERATION)
+        );
         for (Symbol symbol : List.of(stubSymbol, asyncStubSymbol)) {
             directive.context()
                 .writerDelegator()

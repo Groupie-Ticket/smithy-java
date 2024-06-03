@@ -5,6 +5,9 @@
 
 package software.amazon.smithy.java.server;
 
+import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+
 public interface Service {
 
     /**
@@ -12,7 +15,8 @@ public interface Service {
      * @param operationName Unqualified operation name.
      * @return {@link Operation}
      */
-    <I, O> Operation<I, O> getOperation(String operationName);
+    <I extends SerializableStruct, O extends SerializableStruct> Operation<I, O> getOperation(String operationName);
 
+    SdkSchema getSchema();
 
 }

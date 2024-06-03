@@ -533,7 +533,7 @@ public final class Schema {
          */
         public Builder type(ShapeType type) {
             switch (type) {
-                case MEMBER, SERVICE, RESOURCE -> throw new IllegalStateException("Cannot set schema type to " + type);
+                case MEMBER, RESOURCE -> throw new IllegalStateException("Cannot set schema type to " + type);
             }
             this.type = type;
             return this;

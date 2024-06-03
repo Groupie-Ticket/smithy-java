@@ -18,6 +18,7 @@ smithy-aws-traits = { module = "software.amazon.smithy:smithy-aws-traits", versi
 
 jsoniter = { module = "com.jsoniter:jsoniter", version.ref = "jsoniter"}
 
+netty-all = {module = "io.netty:netty-all", version.ref = "netty"}
 netty-codec-http2 = { module = "io.netty:netty-codec-http2", version.ref = "netty" }
 netty-codec-http = { module = "io.netty:netty-codec-http", version.ref = "netty" }
 
