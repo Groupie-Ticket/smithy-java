@@ -15,7 +15,7 @@ import software.amazon.smithy.model.traits.HttpQueryParamsTrait;
 import software.amazon.smithy.model.traits.HttpQueryTrait;
 import software.amazon.smithy.model.traits.HttpResponseCodeTrait;
 
-final class BindingMatcher {
+public final class BindingMatcher {
 
     enum Binding {
         HEADER,
@@ -41,11 +41,11 @@ final class BindingMatcher {
         this.isRequest = isRequest;
     }
 
-    static BindingMatcher requestMatcher() {
+    public static BindingMatcher requestMatcher() {
         return new BindingMatcher(true);
     }
 
-    static BindingMatcher responseMatcher() {
+    public static BindingMatcher responseMatcher() {
         return new BindingMatcher(false);
     }
 

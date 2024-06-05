@@ -13,7 +13,7 @@ public sealed interface Request permits RequestImpl {
 
     Context getContext();
 
-    <T extends Value> Value getValue();
+    <T extends Value> T getValue();
 
     <T extends Value> void setValue(T value);
 

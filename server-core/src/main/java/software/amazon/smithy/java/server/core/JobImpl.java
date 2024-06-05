@@ -7,6 +7,7 @@ package software.amazon.smithy.java.server.core;
 
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import software.amazon.smithy.java.runtime.core.Context;
 
 public final class JobImpl implements Job {
@@ -15,6 +16,7 @@ public final class JobImpl implements Job {
     private final Reply reply;
     private final Context context;
     private final AtomicBoolean isDone = new AtomicBoolean(false);
+    private final AtomicReference<Throwable> failure = new AtomicReference<>();
 
     public JobImpl(Request request, Reply reply) {
         this.request = request;
@@ -49,6 +51,11 @@ public final class JobImpl implements Job {
 
     @Override
     public Optional<Throwable> getFailure() {
-        return Optional.empty();
+        return Optional.ofNullable(failure.get());
+    }
+
+    @Override
+    public void setFailure(Throwable t) {
+        failure.set(t);
     }
 }

@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.server.core;
 
 import java.util.concurrent.CompletableFuture;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.java.server.core.attributes.ServiceAttributes;
@@ -21,12 +22,21 @@ public class OperationHandler implements Handler {
 
     @Override
     public CompletableFuture<Void> before(Job job) {
-        Operation<?, ?> operation = job.getRequest().getContext().get(ServiceAttributes.OPERATION);
+        Operation operation = job.getRequest().getContext().get(ServiceAttributes.OPERATION);
+        ShapeValue<? extends SerializableStruct> requestValue = job.getRequest().getValue();
+        SerializableStruct input = requestValue.get();
         CompletableFuture<Void> cf = new CompletableFuture<>();
         if (operation.isAsync()) {
-            operation.asyncFunction().apply(null, null).thenRun(() -> cf.complete(null));
+            CompletableFuture<? extends SerializableStruct> response = (CompletableFuture<? extends SerializableStruct>) operation
+                .asyncFunction()
+                .apply(input, null);
+            response.whenComplete((result, error) -> {
+                job.getReply().setValue(new ShapeValue<>(result));
+                cf.complete(null);
+            });
         } else {
-            operation.function().apply(null, null);
+            SerializableStruct output = (SerializableStruct) operation.function().apply(input, null);
+            job.getReply().setValue(new ShapeValue<>(output));
             cf.complete(null);
         }
         return cf;

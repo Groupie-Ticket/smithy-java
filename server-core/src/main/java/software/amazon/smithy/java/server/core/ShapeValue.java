@@ -5,17 +5,18 @@
 
 package software.amazon.smithy.java.server.core;
 
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 
-public final class ByteValue implements Value<byte[]> {
-    private final byte[] value;
+public final class ShapeValue<T extends SerializableStruct> implements Value<T> {
 
-    public ByteValue(byte[] value) {
+    private final T value;
+
+    public ShapeValue(T value) {
         this.value = value;
     }
 
     @Override
-    public byte[] get() {
+    public T get() {
         return value;
     }
-
 }
