@@ -36,12 +36,10 @@ public class RestJsonProtocolHandler extends ServerProtocolHandler {
     }
 
     @Override
-    public CompletableFuture<Void> before(Job job) {
-        return null;
+    public void doBefore(Job job) {
     }
 
     @Override
-    public CompletableFuture<Void> after(Job job) {
-        return null;
+    public void doAfter(Job job) {
     }
 }
