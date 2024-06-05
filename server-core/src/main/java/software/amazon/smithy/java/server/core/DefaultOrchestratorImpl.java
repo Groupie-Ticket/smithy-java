@@ -39,6 +39,7 @@ public class DefaultOrchestratorImpl implements Orchestrator {
     private static List<Handler> assembleHandlers(Service service, List<Handler> endpointHandlers) {
         List<Handler> handlers = new ArrayList<>();
         handlers.addAll(endpointHandlers);
+        handlers.add(new HttpHandler());
         handlers.addAll(
             service.getSchema()
                 .getSupportedProtocols()
@@ -48,7 +49,7 @@ public class DefaultOrchestratorImpl implements Orchestrator {
                 .toList()
         );
         handlers.add(new OperationHandler(service));
-        return handlers;
+        return handlers.stream().map(LoggingHandler::new).map(Handler.class::cast).toList();
     }
 
     private final class Work {
@@ -56,7 +57,7 @@ public class DefaultOrchestratorImpl implements Orchestrator {
         private final Queue<Handler> queue;
         private final BlockingQueue<Work> workQueue;
         private final CompletableFuture<Job> signal;
-        private final Queue<Handler> soFar;
+        private final Deque<Handler> soFar;
         private State state = State.BEFORE;
 
         private Work(Job job, List<Handler> handlers, BlockingQueue<Work> workQueue, CompletableFuture<Job> signal) {
@@ -78,7 +79,7 @@ public class DefaultOrchestratorImpl implements Orchestrator {
                     break;
                 }
                 Handler handler = queue.poll();
-                soFar.add(handler);
+                soFar.push(handler);
                 CompletableFuture<Void> cf = handler.before(job);
                 if (!cf.isDone()) {
                     cf.whenComplete((e, t) -> DefaultOrchestratorImpl.this.queue.add(this));
@@ -87,7 +88,7 @@ public class DefaultOrchestratorImpl implements Orchestrator {
             }
             if (state == State.AFTER) {
                 while (!soFar.isEmpty()) {
-                    Handler handler = soFar.poll();
+                    Handler handler = soFar.pop();
                     CompletableFuture<Void> cf = handler.after(job);
                     if (!cf.isDone()) {
                         cf.whenComplete((e, t) -> DefaultOrchestratorImpl.this.queue.add(this));
@@ -129,6 +130,27 @@ public class DefaultOrchestratorImpl implements Orchestrator {
             } catch (InterruptedException ignored) {
 
             }
+        }
+    }
+
+    private static final class LoggingHandler implements Handler {
+
+        private final Handler delegate;
+
+        private LoggingHandler(Handler delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public CompletableFuture<Void> before(Job job) {
+            System.out.println("Before : " + delegate.getClass().getSimpleName());
+            return delegate.before(job);
+        }
+
+        @Override
+        public CompletableFuture<Void> after(Job job) {
+            System.out.println("After : " + delegate.getClass().getSimpleName());
+            return delegate.after(job);
         }
     }
 

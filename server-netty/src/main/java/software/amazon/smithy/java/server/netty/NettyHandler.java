@@ -18,6 +18,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+
+import io.netty.handler.codec.http.HttpHeaders.Names;
 import software.amazon.smithy.java.server.core.*;
 import software.amazon.smithy.java.server.core.attributes.HttpAttributes;
 
@@ -71,11 +73,16 @@ final class NettyHandler extends ChannelDuplexHandler {
 
     private static void writeResponse(Channel channel, CompletableFuture<Job> future) {
         future.whenComplete((job, throwable) -> {
-            ByteValue byteValue = job.getReply().getValue();
-            ByteBuf content = Unpooled.wrappedBuffer(byteValue.value());
-            HttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, content);
-            setHeaders(job.getReply(), response);
-            channel.writeAndFlush(response);
+            try {
+                ByteValue byteValue = job.getReply().getValue();
+                ByteBuf content = Unpooled.wrappedBuffer(byteValue.value());
+                HttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, content);
+                setHeaders(job.getReply(), response);
+                response.headers().set(Names.CONTENT_LENGTH, content.readableBytes());
+                channel.writeAndFlush(response);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         });
     }
 

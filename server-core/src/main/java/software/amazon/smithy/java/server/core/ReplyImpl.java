@@ -10,10 +10,15 @@ import software.amazon.smithy.java.runtime.core.Context;
 public final class ReplyImpl implements Reply {
 
     private Value value;
+    private final Context context;
+
+    public ReplyImpl() {
+        context = Context.create();
+    }
 
     @Override
     public Context getContext() {
-        return null;
+        return context;
     }
 
     @Override

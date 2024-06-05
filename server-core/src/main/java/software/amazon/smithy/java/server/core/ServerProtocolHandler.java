@@ -8,7 +8,7 @@ package software.amazon.smithy.java.server.core;
 import software.amazon.smithy.java.runtime.core.Context;
 import software.amazon.smithy.model.shapes.ShapeId;
 
-public abstract class ServerProtocolHandler implements Handler {
+public abstract class ServerProtocolHandler implements SyncHandler {
 
     private static final Context.Key<Handler> PROTOCOL_HANDLER = Context.key("protocol-handler");
 
