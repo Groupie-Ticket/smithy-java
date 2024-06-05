@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
+import static java.util.function.Predicate.not;
+
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
@@ -14,6 +16,9 @@ import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
 
+/**
+ * TODO: docs
+ */
 record StructureDeserializerGenerator(
     JavaWriter writer, Shape shape, SymbolProvider symbolProvider, Model model, ServiceShape service
 ) implements Runnable {
@@ -41,7 +46,13 @@ record StructureDeserializerGenerator(
             """;
         writer.putContext("shapeDeserializer", ShapeDeserializer.class);
         writer.putContext("sdkSchema", Schema.class);
-        writer.putContext("hasMembers", !shape.members().isEmpty());
+        writer.putContext(
+            "hasMembers",
+            shape.members()
+                .stream()
+                .map(s -> model.expectShape(s.getTarget()))
+                .anyMatch(not(t -> CodegenUtils.isStreamingBlob(t) || CodegenUtils.isEventStream(t)))
+        );
         writer.putContext("cases", writer.consumer(this::generateMemberSwitchCases));
         writer.write(template);
         writer.popState();
@@ -52,8 +63,8 @@ record StructureDeserializerGenerator(
         for (var iter = CodegenUtils.getSortedMembers(shape).iterator(); iter.hasNext(); idx++) {
             var member = iter.next();
             var target = model.expectShape(member.getTarget());
-            if (CodegenUtils.isStreamingBlob(target)) {
-                // Streaming blobs are not deserialized by the builder class.
+            if (CodegenUtils.isStreamingBlob(target) || CodegenUtils.isEventStream(target)) {
+                // Streaming blobs and unions are not deserialized by the builder class.
                 continue;
             }
 

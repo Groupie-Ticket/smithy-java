@@ -42,7 +42,7 @@ final class RestJsonProtocolHandler extends ServerProtocolHandler {
         UriPattern uri = UriPattern.parse(job.getRequest().getContext().get(HttpAttributes.HTTP_URI).getPath());
         Operation<?, ?> selectedOperation = null;
         for (Operation<?, ?> operation : operations) {
-            UriPattern uriPattern = operation.getSdkOperation().schema().expectTrait(HttpTrait.class).getUri();
+            UriPattern uriPattern = operation.getApiOperation().schema().expectTrait(HttpTrait.class).getUri();
             if (uriPattern.equals(uri)) {
                 selectedOperation = operation;
                 break;

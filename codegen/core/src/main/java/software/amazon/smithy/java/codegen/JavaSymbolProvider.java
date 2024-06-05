@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Flow;
 import software.amazon.smithy.codegen.core.CodegenException;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
@@ -211,15 +212,21 @@ public class JavaSymbolProvider implements ShapeVisitor<Symbol>, SymbolProvider 
 
     @Override
     public Symbol memberShape(MemberShape memberShape) {
-        return toSymbol(
-            model.getShape(memberShape.getTarget())
-                .orElseThrow(
-                    () -> new CodegenException(
-                        "Could not find shape " + memberShape.getTarget() + " targeted by "
-                            + memberShape
-                    )
+        var target = model.getShape(memberShape.getTarget())
+            .orElseThrow(
+                () -> new CodegenException(
+                    "Could not find shape " + memberShape.getTarget() + " targeted by "
+                        + memberShape
                 )
-        );
+            );
+
+        if (target.isUnionShape() && target.hasTrait(StreamingTrait.class)) {
+            return CodegenUtils.fromClass(Flow.Publisher.class)
+                .toBuilder()
+                .addReference(toSymbol(target))
+                .build();
+        }
+        return toSymbol(target);
     }
 
     @Override

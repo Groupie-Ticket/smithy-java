@@ -9,6 +9,8 @@ extra["moduleName"] = "software.amazon.smithy.java.codegen.server"
 
 dependencies {
     implementation(project(":server-core"))
+    implementation(libs.smithy.aws.traits)
+    implementation(libs.smithy.protocol.traits)
 }
 
 // Execute building of Java classes using an executable class

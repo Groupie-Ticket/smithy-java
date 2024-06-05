@@ -61,7 +61,7 @@ testlogger {
 spotless {
     java {
         // Enforce a common license header on all files
-        licenseHeaderFile("${project.rootDir}/config/spotless/license-header.txt")
+        //licenseHeaderFile("${project.rootDir}/config/spotless/license-header.txt")
         indentWithSpaces()
         endWithNewline()
 

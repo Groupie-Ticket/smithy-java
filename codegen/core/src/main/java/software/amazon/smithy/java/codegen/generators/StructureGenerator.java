@@ -622,7 +622,8 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
             // Add non-static builder properties
             for (var member : shape.members()) {
                 var memberName = symbolProvider.toMemberName(member);
-                if (CodegenUtils.isStreamingBlob(model.expectShape(member.getTarget()))) {
+                var target = model.expectShape(member.getTarget());
+                if (CodegenUtils.isStreamingBlob(target)) {
                     // Streaming blobs need a custom initializer
                     writer.write(
                         "private $1T $2L = $1T.ofEmpty();",

@@ -182,6 +182,10 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
 
     @Override
     public Void unionShape(UnionShape unionShape) {
+        // Event Streams do not generate a member serializer
+        if (CodegenUtils.isEventStream(unionShape)) {
+            return null;
+        }
         writer.write("serializer.writeStruct(${schema:L}, ${state:L})");
         return null;
     }
