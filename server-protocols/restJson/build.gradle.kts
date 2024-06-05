@@ -1,19 +1,14 @@
 plugins {
-    id("java")
+    id("smithy-java.module-conventions")
 }
 
-group = "org.example"
-version = "unspecified"
+description = "This module provides Server RestJson functionality"
 
-repositories {
-    mavenCentral()
-}
+extra["displayName"] = "Smithy :: Java :: Server Protocols :: RestJson"
+extra["moduleName"] = "software.amazon.smithy.java.server.protocols.restjson"
+
 
 dependencies {
-    testImplementation(platform("org.junit:junit-bom:5.10.0"))
-    testImplementation("org.junit.jupiter:junit-jupiter")
-}
-
-tasks.test {
-    useJUnitPlatform()
+    implementation(project(":server"))
+    implementation(project(":server-core"))
 }

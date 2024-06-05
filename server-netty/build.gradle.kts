@@ -17,6 +17,7 @@ dependencies {
     itImplementation(project(":server"))
     itImplementation(project(":server-core"))
     itImplementation(project(":core"))
+    itImplementation(project(":server-protocols:restJson"))
     testImplementation(project(":codegen::server"))
     implementation(libs.smithy.codegen)
 }

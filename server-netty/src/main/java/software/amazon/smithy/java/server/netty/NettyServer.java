@@ -16,6 +16,7 @@ import io.netty.channel.kqueue.KQueueEventLoopGroup;
 import io.netty.channel.kqueue.KQueueServerSocketChannel;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.util.List;
 import java.util.function.Consumer;
 import software.amazon.smithy.java.server.Server;
 import software.amazon.smithy.java.server.core.DefaultOrchestratorImpl;
@@ -31,8 +32,7 @@ final class NettyServer implements Server {
     NettyServer(NettyServerBuilder builder) {
         var bootstrap = new ServerBootstrap();
 
-
-        Orchestrator orch = new DefaultOrchestratorImpl(builder.services.get(0), builder.numWorkers);
+        Orchestrator orch = new DefaultOrchestratorImpl(builder.services.get(0), builder.numWorkers, List.of());
         NettyHandler handler = new NettyHandler(orch);
         Consumer<ChannelPipeline> handlerInstaller = (pipeline) -> {
             pipeline.addLast(handler);
