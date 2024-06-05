@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.server.core;
 
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import software.amazon.smithy.java.runtime.core.Context;
 
 public final class JobImpl implements Job {
@@ -12,6 +14,7 @@ public final class JobImpl implements Job {
     private final Request request;
     private final Reply reply;
     private final Context context;
+    private final AtomicBoolean isDone = new AtomicBoolean(false);
 
     public JobImpl(Request request, Reply reply) {
         this.request = request;
@@ -32,5 +35,20 @@ public final class JobImpl implements Job {
     @Override
     public Context getContext() {
         return context;
+    }
+
+    @Override
+    public boolean isDone() {
+        return isDone.get();
+    }
+
+    @Override
+    public void setDone() {
+        isDone.set(true);
+    }
+
+    @Override
+    public Optional<Throwable> getFailure() {
+        return Optional.empty();
     }
 }

@@ -32,7 +32,7 @@ final class NettyServer implements Server {
         var bootstrap = new ServerBootstrap();
 
 
-        Orchestrator orch = new DefaultOrchestratorImpl(builder.services);
+        Orchestrator orch = new DefaultOrchestratorImpl(builder.services.get(0), builder.numWorkers);
         NettyHandler handler = new NettyHandler(orch);
         Consumer<ChannelPipeline> handlerInstaller = (pipeline) -> {
             pipeline.addLast(handler);

@@ -31,6 +31,7 @@ class NettyServerTest {
 
         @Override
         public GetBeerOutput getBeer(GetBeerInput input, RequestContext context) {
+            System.out.println("Beer invoked");
             return null;
         }
     }
