@@ -5,7 +5,7 @@
 
 package software.amazon.smithy.java.server;
 
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
+import java.util.List;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 
 public interface Service {
@@ -19,4 +19,5 @@ public interface Service {
 
     ServiceSchema getSchema();
 
+    List<Operation<? extends SerializableStruct, ? extends SerializableStruct>> getAllOperations();
 }

@@ -11,16 +11,15 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.DefaultFullHttpResponse;
-import io.netty.handler.codec.http.FullHttpRequest;
-import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.HttpResponse;
-import io.netty.handler.codec.http.HttpResponseStatus;
-import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http.*;
+import java.net.http.HttpHeaders;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.server.core.*;
+import software.amazon.smithy.java.server.core.attributes.HttpAttributes;
 
 @ChannelHandler.Sharable
 final class NettyHandler extends ChannelDuplexHandler {
@@ -51,8 +50,23 @@ final class NettyHandler extends ChannelDuplexHandler {
             content.readBytes(buffer);
             content.release();
             request.setValue(new ByteValue(buffer));
+            setHeaders(request, fullHttpRequest);
         }
         return request;
+    }
+
+    //TODO Fix this after we decide on a header implementation
+    private void setHeaders(Request request, FullHttpRequest fullHttpRequest) {
+        Map<String, List<String>> headers = new HashMap<>();
+        for (String header : fullHttpRequest.headers().names()) {
+            headers.put(header, fullHttpRequest.headers().getAll(header));
+        }
+        request.getContext().put(HttpAttributes.HTTP_HEADERS, HttpHeaders.of(headers, (k, v) -> true));
+    }
+
+    //TODO Fix this after we decide on a header implementation
+    private static void setHeaders(Reply reply, HttpResponse response) {
+        reply.getContext().get(HttpAttributes.HTTP_HEADERS).map().forEach(response.headers()::set);
     }
 
     private static void writeResponse(Channel channel, CompletableFuture<Job> future) {
@@ -60,9 +74,7 @@ final class NettyHandler extends ChannelDuplexHandler {
             ByteValue byteValue = job.getReply().getValue();
             ByteBuf content = Unpooled.wrappedBuffer(byteValue.value());
             HttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, content);
-            response.headers().set(HttpHeaderNames.CONTENT_TYPE, "application/json");
-            response.headers().set(HttpHeaderNames.CONTENT_LENGTH, content.readableBytes());
-            response.headers().set("x-amzn-RequestId", job.getRequest().getRequestId());
+            setHeaders(job.getReply(), response);
             channel.writeAndFlush(response);
         });
     }

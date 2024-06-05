@@ -1,6 +1,8 @@
 $version: "2.0"
 
+
 namespace smithy.java.codegen.server.test
+
 use aws.auth#sigv4
 use aws.protocols#restJson1
 
@@ -11,11 +13,13 @@ service TestService {
     operations: [GetBeer, Echo]
 }
 
+@http(method: "POST", uri: "/get-beer")
 operation GetBeer {
     input: GetBeerInput
     output: GetBeerOutput
 }
 
+@http(method: "POST", uri: "/echo")
 operation Echo {
     input: EchoInput
     output: EchoOutput

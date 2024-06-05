@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.server;
 
+import java.util.Collections;
 import java.util.List;
 import software.amazon.smithy.model.shapes.ShapeId;
 
@@ -13,10 +14,17 @@ public final class ServiceSchema {
     private final ShapeId id;
     private final List<ShapeId> supportedProtocols;
 
+    public ShapeId getId() {
+        return id;
+    }
+
+    public List<ShapeId> getSupportedProtocols() {
+        return supportedProtocols;
+    }
 
     private ServiceSchema(Builder builder) {
         this.id = builder.id;
-        this.supportedProtocols = builder.supportedProtocols;
+        this.supportedProtocols = Collections.unmodifiableList(builder.supportedProtocols);
     }
 
     public static Builder builder() {

@@ -7,6 +7,7 @@ package software.amazon.smithy.java.codegen.server.generators;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 import software.amazon.smithy.aws.traits.protocols.AwsProtocolTrait;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
@@ -37,14 +38,16 @@ public record ServiceSchemaGenerator(
         writer.pushState();
         writer.putContext("schemaClass", ServiceSchema.class);
         writer.putContext("shapeId", shape.toShapeId());
-        writer.putContext("list", List.class);
+        writer.putContext("stream", Stream.class);
         writer.putContext("protocols", supportedProtocols);
-        writer.write("""
-            ${schemaClass:T}.builder()
-                .id(ShapeId.from(${shapeId:S}))
-                .supportedProtocols(${list:T}.of(${#protocols}"${value:L}"${^key.last}, ${/key.last}${/protocols}).stream().map(ShapeId::from).toList())
-                .build();
-            """);
+        writer.write(
+            """
+                ${schemaClass:T}.builder()
+                    .id(ShapeId.from(${shapeId:S}))
+                    .supportedProtocols(${stream:T}.of(${#protocols}"${value:L}"${^key.last}, ${/key.last}${/protocols}).map(ShapeId::from).toList())
+                    .build();
+                """
+        );
         writer.popState();
     }
 }

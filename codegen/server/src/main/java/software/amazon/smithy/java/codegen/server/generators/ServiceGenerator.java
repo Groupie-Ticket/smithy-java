@@ -80,6 +80,7 @@ public class ServiceGenerator implements
                 new BuilderGenerator(writer, shape, directive.symbolProvider(), operationsInfo)
             );
             writer.putContext("serializableStruct", SerializableStruct.class);
+            writer.putContext("operationList", List.class);
             writer.putContext(
                 "schema",
                 new ServiceSchemaGenerator(
@@ -113,6 +114,11 @@ public class ServiceGenerator implements
                         public ${serviceSchema:T} getSchema() {
                             return SCHEMA;
                         }
+
+                        @Override
+                        public ${operationList:T}<${operationHolder:T}<? extends ${serializableStruct:T}, ? extends ${serializableStruct:T}>> getAllOperations() {
+                            return allOperations;
+                        }
                     }
                     """,
                 new GetOperationGenerator(writer, shape, directive.symbolProvider(), operations)
@@ -144,6 +150,13 @@ public class ServiceGenerator implements
                 );
                 writer.popState();
             }
+            if (!notFinal) {
+                writer.write(
+                    "private final $T<$T<? extends ${serializableStruct:T}, ? extends ${serializableStruct:T}>> allOperations;",
+                    List.class,
+                    Operation.class
+                );
+            }
         }
     }
 
@@ -160,10 +173,19 @@ public class ServiceGenerator implements
                     }
                     """,
                 writer.consumer(w -> {
-                    for (Symbol operation : operations) {
-                        var operationName = operation.getProperty(ServerSymbolProperties.OPERATION_FIELD_NAME);
+                    List<String> operationNames = operations.stream()
+                        .map(o -> o.expectProperty(ServerSymbolProperties.OPERATION_FIELD_NAME))
+                        .toList();
+                    writer.pushState();
+                    writer.putContext("operations", operationNames);
+                    for (String operationName : operationNames) {
                         w.write("this.$1L = builder.$1L;", operationName);
                     }
+                    w.write(
+                        "this.allOperations = $T.of(${#operations}${value:L}${^key.last}, ${/key.last}${/operations});",
+                        List.class
+                    );
+                    writer.popState();
                 })
             );
         }

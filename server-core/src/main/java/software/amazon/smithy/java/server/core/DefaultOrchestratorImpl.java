@@ -5,9 +5,7 @@
 
 package software.amazon.smithy.java.server.core;
 
-import java.util.ArrayDeque;
-import java.util.List;
-import java.util.Queue;
+import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
@@ -20,8 +18,8 @@ public class DefaultOrchestratorImpl implements Orchestrator {
     private final BlockingQueue<Work> queue;
     private final int numberOfWorkers;
 
-    public DefaultOrchestratorImpl(Service service, int numberOfWorkers) {
-        this.handlers = assembleHandlers(service);
+    public DefaultOrchestratorImpl(Service service, int numberOfWorkers, List<Handler> endpointHandlers) {
+        this.handlers = Collections.unmodifiableList(assembleHandlers(service, endpointHandlers));
         this.numberOfWorkers = numberOfWorkers;
         this.queue = new LinkedBlockingQueue<>();
         var es = Executors.newFixedThreadPool(numberOfWorkers);
@@ -38,8 +36,19 @@ public class DefaultOrchestratorImpl implements Orchestrator {
         return future;
     }
 
-    private static List<Handler> assembleHandlers(Service service) {
-        return List.of(new OperationHandler(service));
+    private static List<Handler> assembleHandlers(Service service, List<Handler> endpointHandlers) {
+        List<Handler> handlers = new ArrayList<>();
+        handlers.addAll(endpointHandlers);
+        handlers.addAll(
+            service.getSchema()
+                .getSupportedProtocols()
+                .stream()
+                .map(ServerProtocolsIndex::getServerProtocolHandler)
+                .map(p -> p.provideProtocolHandler(service))
+                .toList()
+        );
+        handlers.add(new OperationHandler(service));
+        return handlers;
     }
 
     private final class Work {

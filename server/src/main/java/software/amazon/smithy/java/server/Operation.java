@@ -77,4 +77,8 @@ public final class Operation<I extends SerializableStruct, O extends Serializabl
     public String name() {
         return name;
     }
+
+    public SdkOperation<I, O> getSdkOperation() {
+        return sdkOperation;
+    }
 }

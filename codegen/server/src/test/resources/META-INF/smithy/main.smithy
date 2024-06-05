@@ -13,11 +13,13 @@ service TestService {
     operations: [GetBeer, Echo]
 }
 
+@http(method: "POST", uri: "/get-beer")
 operation GetBeer {
     input: GetBeerInput
     output: GetBeerOutput
 }
 
+@http(method: "POST", uri: "/echo")
 operation Echo {
     input: EchoInput
     output: EchoOutput
