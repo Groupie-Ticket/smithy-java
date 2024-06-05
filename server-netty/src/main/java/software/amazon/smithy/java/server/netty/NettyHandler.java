@@ -18,11 +18,8 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
-
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-
-import io.netty.util.ReferenceCountUtil;
 import software.amazon.smithy.java.server.core.*;
 
 @ChannelHandler.Sharable

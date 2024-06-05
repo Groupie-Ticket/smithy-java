@@ -5,18 +5,17 @@
 
 package software.amazon.smithy.java.server.netty;
 
+import static io.netty.handler.codec.http2.Http2CodecUtil.HTTP_UPGRADE_PROTOCOL_NAME;
+import static io.netty.util.AsciiString.contentEquals;
+
 import io.netty.channel.*;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.HttpServerUpgradeHandler;
 import io.netty.handler.codec.http2.*;
 import io.netty.util.ReferenceCountUtil;
-
 import java.util.List;
 import java.util.function.Consumer;
-
-import static io.netty.handler.codec.http2.Http2CodecUtil.HTTP_UPGRADE_PROTOCOL_NAME;
-import static io.netty.util.AsciiString.contentEquals;
 
 
 final class NettyChannelInitializer extends ChannelInitializer<Channel> {
@@ -55,11 +54,14 @@ final class NettyChannelInitializer extends ChannelInitializer<Channel> {
     }
 
     private static ChannelHandler getUpgradeHandler(HttpServerCodec httpServerCodec, Http2FrameCodec http2Codec) {
-        HttpServerUpgradeHandler.UpgradeCodecFactory upgradeCodecFactory
-                = protocol -> contentEquals(HTTP_UPGRADE_PROTOCOL_NAME, protocol) ?
-                new Http2ServerUpgradeCodec("http2Codec", http2Codec) : null;
-        HttpServerUpgradeHandler upgradeHandler =
-                new RetainingHttpServerUpgradeHandler(httpServerCodec, upgradeCodecFactory);
+        HttpServerUpgradeHandler.UpgradeCodecFactory upgradeCodecFactory = protocol -> contentEquals(
+            HTTP_UPGRADE_PROTOCOL_NAME,
+            protocol
+        ) ? new Http2ServerUpgradeCodec("http2Codec", http2Codec) : null;
+        HttpServerUpgradeHandler upgradeHandler = new RetainingHttpServerUpgradeHandler(
+            httpServerCodec,
+            upgradeCodecFactory
+        );
         return new CleartextHttp2ServerUpgradeHandler(httpServerCodec, upgradeHandler, http2Codec);
     }
 
@@ -71,7 +73,7 @@ final class NettyChannelInitializer extends ChannelInitializer<Channel> {
             @Override
             public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
                 if (evt instanceof HttpServerUpgradeHandler.UpgradeEvent
-                        || evt instanceof CleartextHttp2ServerUpgradeHandler.PriorKnowledgeUpgradeEvent) {
+                    || evt instanceof CleartextHttp2ServerUpgradeHandler.PriorKnowledgeUpgradeEvent) {
                     // Remove this handler and everything after it
                     while (pipeline.removeLast() != this) {
                         // do nothing
@@ -98,8 +100,10 @@ final class NettyChannelInitializer extends ChannelInitializer<Channel> {
     }
 
     private static final class RetainingHttpServerUpgradeHandler extends HttpServerUpgradeHandler {
-        RetainingHttpServerUpgradeHandler(HttpServerCodec httpServerCodec,
-                                          UpgradeCodecFactory upgradeCodecFactory) {
+        RetainingHttpServerUpgradeHandler(
+            HttpServerCodec httpServerCodec,
+            UpgradeCodecFactory upgradeCodecFactory
+        ) {
             super(httpServerCodec, upgradeCodecFactory);
         }
 

@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.server.core;
 
+import java.util.Optional;
 import software.amazon.smithy.java.runtime.core.Context;
 
 public sealed interface Job permits JobImpl {
@@ -14,4 +15,10 @@ public sealed interface Job permits JobImpl {
     Reply getReply();
 
     Context getContext();
+
+    boolean isDone();
+
+    void setDone();
+
+    Optional<Throwable> getFailure();
 }

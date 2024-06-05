@@ -13,6 +13,10 @@ dependencies {
     implementation(project(":server"))
     implementation(project(":server-core"))
     implementation(project(":core"))
+    itImplementation(libs.netty.all)
+    itImplementation(project(":server"))
+    itImplementation(project(":server-core"))
+    itImplementation(project(":core"))
     testImplementation(project(":codegen::server"))
     implementation(libs.smithy.codegen)
 }
