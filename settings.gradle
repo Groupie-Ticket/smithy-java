@@ -41,4 +41,7 @@ include 'server-core'
 include 'server-netty'
 include 'server'
 include 'server-netty'
+include 'server-protocols'
+include 'server-protocols:restJson'
+findProject(':server-protocols:restJson')?.name = 'restJson'
 

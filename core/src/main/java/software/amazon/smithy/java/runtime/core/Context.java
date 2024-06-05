@@ -144,6 +144,18 @@ public interface Context {
      * <p>The mapping function should not modify the context during computation.
      *
      * @param key Property key to get by exact reference identity.
+     * @param <T> A function that computes a value for this key if the value is not assigned.
+     * @return the value assigned to the key.
+     * @param <T> Value type.
+     */
+    <T> T putIfAbsent(Key<T> key, T value);
+
+    /**
+     * Get a property or set and get a default if not present.
+     *
+     * <p>The mapping function should not modify the context during computation.
+     *
+     * @param key Property key to get by exact reference identity.
      * @param mappingFunction A function that computes a value for this key if the value is not assigned.
      * @return the value assigned to the key.
      * @param <T> Value type.
@@ -186,6 +198,11 @@ public interface Context {
             @SuppressWarnings("unchecked")
             public <T> T computeIfAbsent(Key<T> key, Function<Key<T>, ? extends T> mappingFunction) {
                 return (T) attributes.computeIfAbsent(key, k -> mappingFunction.apply((Key<T>) k));
+            }
+
+            @Override
+            public <T> T putIfAbsent(Key<T> key, T value) {
+                return (T) attributes.putIfAbsent(key, value);
             }
         };
     }
