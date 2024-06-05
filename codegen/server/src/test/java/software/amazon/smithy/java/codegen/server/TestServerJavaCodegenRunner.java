@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.codegen.server;
 
 import java.nio.file.Paths;
-import java.util.Optional;
 import software.amazon.smithy.build.FileManifest;
 import software.amazon.smithy.build.PluginContext;
 import software.amazon.smithy.model.Model;

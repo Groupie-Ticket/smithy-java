@@ -2,6 +2,8 @@ $version: "2"
 
 namespace smithy.java.codegen.test.structures
 
+use smithy.java.codegen.test.structures.members#EventStreaming
+
 resource StructureTests {
     operations: [
         BlobMembers
@@ -26,5 +28,6 @@ resource StructureTests {
         IntEnumMembers
         ClientErrorCorrection
         Defaults
+        EventStreaming
     ]
 }

@@ -13,7 +13,6 @@ import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.JavaSymbolProvider;
 import software.amazon.smithy.java.codegen.client.generators.ClientImplementationGenerator;
 import software.amazon.smithy.java.codegen.client.generators.ClientInterfaceGenerator;
-import software.amazon.smithy.java.codegen.client.generators.OperationGenerator;
 import software.amazon.smithy.java.codegen.generators.EnumGenerator;
 import software.amazon.smithy.java.codegen.generators.ListGenerator;
 import software.amazon.smithy.java.codegen.generators.MapGenerator;

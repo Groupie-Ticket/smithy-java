@@ -8,7 +8,7 @@ package software.amazon.smithy.java.server;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
-import software.amazon.smithy.java.runtime.core.schema.SdkOperation;
+import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 
 public final class Operation<I extends SerializableStruct, O extends SerializableStruct> {
@@ -16,14 +16,14 @@ public final class Operation<I extends SerializableStruct, O extends Serializabl
     private final boolean isAsync;
     private final BiFunction<I, RequestContext, O> operation;
     private final BiFunction<I, RequestContext, CompletableFuture<O>> asyncOperation;
-    private final SdkOperation<I, O> sdkOperation;
+    private final ApiOperation<I, O> sdkOperation;
 
 
     private Operation(
         String name,
         BiFunction<I, RequestContext, O> operation,
         BiFunction<I, RequestContext, CompletableFuture<O>> asyncOperation,
-        SdkOperation<I, O> sdkOperation
+        ApiOperation<I, O> sdkOperation
     ) {
         if (operation != null && asyncOperation != null) {
             throw new IllegalArgumentException("At least one of operation and asyncOperation must be null");
@@ -43,7 +43,7 @@ public final class Operation<I extends SerializableStruct, O extends Serializabl
     public static <I extends SerializableStruct, O extends SerializableStruct> Operation<I, O> of(
         String name,
         BiFunction<I, RequestContext, O> operation,
-        SdkOperation<I, O> sdkOperation
+        ApiOperation<I, O> sdkOperation
     ) {
         return new Operation<>(name, operation, null, sdkOperation);
     }
@@ -51,7 +51,7 @@ public final class Operation<I extends SerializableStruct, O extends Serializabl
     public static <I extends SerializableStruct, O extends SerializableStruct> Operation<I, O> ofAsync(
         String name,
         BiFunction<I, RequestContext, CompletableFuture<O>> operation,
-        SdkOperation<I, O> sdkOperation
+        ApiOperation<I, O> sdkOperation
     ) {
         return new Operation<>(name, null, operation, sdkOperation);
     }
@@ -78,7 +78,7 @@ public final class Operation<I extends SerializableStruct, O extends Serializabl
         return name;
     }
 
-    public SdkOperation<I, O> getSdkOperation() {
+    public ApiOperation<I, O> getApiOperation() {
         return sdkOperation;
     }
 }
