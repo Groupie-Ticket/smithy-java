@@ -15,6 +15,7 @@ import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.HttpHeaders.Names;
 import java.net.URI;
 import java.net.http.HttpHeaders;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -79,21 +80,42 @@ final class NettyHandler extends ChannelDuplexHandler {
 
     private static void writeResponse(Channel channel, CompletableFuture<Job> future) {
         future.whenComplete((job, throwable) -> {
-            try {
-                ByteValue byteValue = job.getReply().getValue();
-                ByteBuf content = Unpooled.wrappedBuffer(byteValue.value());
-                HttpResponse response = new DefaultFullHttpResponse(
-                    HttpVersion.HTTP_1_1,
-                    HttpResponseStatus.OK,
-                    content
-                );
-                setHeaders(job.getReply(), response);
-                response.headers().set(Names.CONTENT_LENGTH, content.readableBytes());
-                channel.writeAndFlush(response);
-            } catch (Exception e) {
-                e.printStackTrace();
+            if (throwable == null) {
+                try {
+                    if (job.getFailure().isPresent()) {
+                        sendErrorResponse(job.getFailure().get(), channel);
+                        return;
+                    }
+                    ByteValue byteValue = job.getReply().getValue();
+                    ByteBuf content = Unpooled.wrappedBuffer(byteValue.get());
+                    HttpResponse response = new DefaultFullHttpResponse(
+                        HttpVersion.HTTP_1_1,
+                        HttpResponseStatus.OK,
+                        content
+                    );
+                    setHeaders(job.getReply(), response);
+                    response.headers().set(Names.CONTENT_LENGTH, content.readableBytes());
+                    channel.writeAndFlush(response);
+                } catch (Exception e) {
+                    job.setFailure(e);
+                    sendErrorResponse(e, channel);
+                }
+            } else {
+                sendErrorResponse(throwable, channel);
             }
         });
+    }
+
+    private static void sendErrorResponse(Throwable throwable, Channel channel) {
+        throwable.printStackTrace();
+        ByteBuf content = Unpooled.wrappedBuffer(throwable.getClass().getSimpleName().getBytes(StandardCharsets.UTF_8));
+        HttpResponse response = new DefaultFullHttpResponse(
+            HttpVersion.HTTP_1_1,
+            HttpResponseStatus.INTERNAL_SERVER_ERROR,
+            content
+        );
+        response.headers().set(Names.CONTENT_LENGTH, content.readableBytes());
+        channel.writeAndFlush(response);
     }
 
 }

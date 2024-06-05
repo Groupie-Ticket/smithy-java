@@ -21,4 +21,7 @@ public sealed interface Job permits JobImpl {
     void setDone();
 
     Optional<Throwable> getFailure();
+
+    void setFailure(Throwable t);
+
 }

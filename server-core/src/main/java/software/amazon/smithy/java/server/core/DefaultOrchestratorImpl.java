@@ -69,34 +69,62 @@ public class DefaultOrchestratorImpl implements Orchestrator {
         }
 
         public void work() {
-            if ((job.isDone() || job.getFailure().isPresent()) && state == State.BEFORE) {
-                state = State.AFTER;
-            }
-
-            while (state == State.BEFORE) {
-                if (queue.isEmpty()) {
+            try {
+                if ((job.isDone() || job.getFailure().isPresent()) && state == State.BEFORE) {
                     state = State.AFTER;
-                    break;
                 }
-                Handler handler = queue.poll();
-                soFar.push(handler);
-                CompletableFuture<Void> cf = handler.before(job);
-                if (!cf.isDone()) {
-                    cf.whenComplete((e, t) -> DefaultOrchestratorImpl.this.queue.add(this));
-                    return;
-                }
-            }
-            if (state == State.AFTER) {
-                while (!soFar.isEmpty()) {
-                    Handler handler = soFar.pop();
-                    CompletableFuture<Void> cf = handler.after(job);
+
+                while (state == State.BEFORE) {
+                    if (queue.isEmpty() || job.getFailure().isPresent()) {
+                        state = State.AFTER;
+                        break;
+                    }
+                    Handler handler = queue.poll();
+                    soFar.push(handler);
+                    CompletableFuture<Void> cf = handler.before(job);
                     if (!cf.isDone()) {
-                        cf.whenComplete((e, t) -> DefaultOrchestratorImpl.this.queue.add(this));
-                        return;
+                        cf.whenComplete((e, t) -> {
+                            if (t != null) {
+                                job.setFailure(t);
+                            }
+                            DefaultOrchestratorImpl.this.queue.add(this);
+                        });
+                        break;
+                    }
+                    if (cf.isCompletedExceptionally()) {
+                        cf.exceptionally(t -> {
+                            job.setFailure(t);
+                            return null;
+                        });
+                        state = State.AFTER;
+                        break;
                     }
                 }
-                state = State.DONE;
-                signal.complete(job);
+                if (state == State.AFTER) {
+                    while (!soFar.isEmpty()) {
+                        Handler handler = soFar.pop();
+                        CompletableFuture<Void> cf = handler.after(job);
+                        if (!cf.isDone()) {
+                            cf.whenComplete((e, t) -> {
+                                if (t != null) {
+                                    job.setFailure(t);
+                                }
+                                DefaultOrchestratorImpl.this.queue.add(this);
+                            });
+                            break;
+                        }
+                        if (cf.isCompletedExceptionally()) {
+                            cf.exceptionally(t -> {
+                                job.setFailure(t);
+                                return null;
+                            });
+                        }
+                    }
+                    state = State.DONE;
+                    signal.complete(job);
+                }
+            } catch (Exception e) {
+                signal.completeExceptionally(e);
             }
         }
 

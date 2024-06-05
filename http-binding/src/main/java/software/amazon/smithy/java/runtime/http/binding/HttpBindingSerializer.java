@@ -36,7 +36,7 @@ import software.amazon.smithy.model.traits.MediaTypeTrait;
  * <p>This serializer requires that a top-level structure shape is written and will throw an
  * UnsupportedOperationException if any other kind of shape is first written to it.
  */
-final class HttpBindingSerializer extends SpecificShapeSerializer implements ShapeSerializer {
+public final class HttpBindingSerializer extends SpecificShapeSerializer implements ShapeSerializer {
 
     private static final String DEFAULT_BLOB_CONTENT_TYPE = "application/octet-stream";
     private static final String DEFAULT_STRING_CONTENT_TYPE = "text/plain";
@@ -61,14 +61,18 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         headers.computeIfAbsent(field, f -> new ArrayList<>()).add(value);
     };
 
-    HttpBindingSerializer(
+    public HttpBindingSerializer(
         HttpTrait httpTrait,
         Codec payloadCodec,
         BindingMatcher bindingMatcher,
         DataStream httpPayload
     ) {
-        uriPattern = httpTrait.getUri();
-        responseStatus = httpTrait.getCode();
+        if (httpTrait != null) {
+            uriPattern = httpTrait.getUri();
+            responseStatus = httpTrait.getCode();
+        } else {
+            uriPattern = null;
+        }
         this.payloadCodec = payloadCodec;
         this.bindingMatcher = bindingMatcher;
         headerSerializer = new HttpHeaderSerializer(headerConsumer);
@@ -96,18 +100,11 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         if (foundBody || !foundPayload) {
             shapeBodyOutput = new ByteArrayOutputStream();
             shapeBodySerializer = payloadCodec.createSerializer(shapeBodyOutput);
-            // Serialize only the body members to the codec.
-            SerializableStruct.filteredMembers(schema, struct, this::bodyBindingPredicate)
-                .serialize(shapeBodySerializer);
+            struct.serializeMembers(new BindingSerializer(this, shapeBodySerializer));
             headers.put("Content-Type", List.of(payloadCodec.getMediaType()));
+        } else {
+            struct.serializeMembers(new BindingSerializer(this, null));
         }
-
-        // Serialize the bindings that aren't BODY (the derived body structure).
-        struct.serializeMembers(new BindingSerializer(this));
-    }
-
-    private boolean bodyBindingPredicate(Schema member) {
-        return bindingMatcher.match(member) == BindingMatcher.Binding.BODY;
     }
 
     @Override
@@ -133,23 +130,23 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         headers.put("Content-Type", List.of(contentType));
     }
 
-    HttpHeaders getHeaders() {
+    public HttpHeaders getHeaders() {
         return HttpHeaders.of(headers, (k, v) -> true);
     }
 
-    String getQueryString() {
+    public String getQueryString() {
         return queryStringParams.toString();
     }
 
-    boolean hasQueryString() {
+    public boolean hasQueryString() {
         return !queryStringParams.isEmpty();
     }
 
-    boolean hasBody() {
+    public boolean hasBody() {
         return shapeBodyOutput != null || httpPayload != null;
     }
 
-    DataStream getBody() {
+    public DataStream getBody() {
         if (httpPayload != null) {
             return httpPayload;
         } else if (shapeBodyOutput != null) {
@@ -159,7 +156,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
         }
     }
 
-    long getBodyLength() {
+    public long getBodyLength() {
         if (shapeBodyOutput != null) {
             return shapeBodyOutput.size();
         } else if (httpPayload != null) {
@@ -199,11 +196,13 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
 
     private static final class BindingSerializer extends InterceptingSerializer {
         private final HttpBindingSerializer serializer;
+        private final ShapeSerializer bodyStructSerializer;
         private ByteArrayOutputStream structureBytes;
         private ShapeSerializer structureSerializer;
 
-        private BindingSerializer(HttpBindingSerializer serializer) {
+        private BindingSerializer(HttpBindingSerializer serializer, ShapeSerializer bodyStructSerializer) {
             this.serializer = serializer;
+            this.bodyStructSerializer = bodyStructSerializer;
         }
 
         @Override
@@ -236,6 +235,7 @@ final class HttpBindingSerializer extends SpecificShapeSerializer implements Sha
 
         @Override
         protected void after(Schema schema) {
+            flush();
             if (structureBytes != null) {
                 structureSerializer.flush();
                 serializer.setHttpPayload(

@@ -7,10 +7,7 @@ package software.amazon.smithy.java.server.netty;
 
 import java.net.URI;
 import org.junit.jupiter.api.Test;
-import smithy.java.codegen.server.test.model.EchoInput;
-import smithy.java.codegen.server.test.model.EchoOutput;
-import smithy.java.codegen.server.test.model.GetBeerInput;
-import smithy.java.codegen.server.test.model.GetBeerOutput;
+import smithy.java.codegen.server.test.model.*;
 import smithy.java.codegen.server.test.service.EchoOperation;
 import smithy.java.codegen.server.test.service.GetBeerOperation;
 import smithy.java.codegen.server.test.service.TestService;
@@ -32,7 +29,7 @@ class NettyServerTest {
         @Override
         public GetBeerOutput getBeer(GetBeerInput input, RequestContext context) {
             System.out.println("Beer invoked");
-            return null;
+            return GetBeerOutput.builder().value(Beer.builder().id(input.id()).name("Test Beer").build()).build();
         }
     }
 

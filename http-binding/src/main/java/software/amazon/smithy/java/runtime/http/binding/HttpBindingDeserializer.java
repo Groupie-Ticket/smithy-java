@@ -28,7 +28,7 @@ import software.amazon.smithy.utils.SmithyBuilder;
  * <p>This deserializer requires that a top-level structure shape is deserialized and will throw an
  * UnsupportedOperationException if any other kind of shape is first read from it.
  */
-final class HttpBindingDeserializer extends SpecificShapeDeserializer implements ShapeDeserializer {
+public final class HttpBindingDeserializer extends SpecificShapeDeserializer implements ShapeDeserializer {
 
     private static final System.Logger LOGGER = System.getLogger(HttpBindingDeserializer.class.getName());
     private final Codec payloadCodec;
@@ -54,7 +54,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         this.requestPathLabels = builder.requestPathLabels;
     }
 
-    static Builder builder() {
+    public static Builder builder() {
         return new Builder();
     }
 
@@ -158,7 +158,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
         }
     }
 
-    static final class Builder implements SmithyBuilder<HttpBindingDeserializer> {
+    public static final class Builder implements SmithyBuilder<HttpBindingDeserializer> {
         private Map<String, String> requestPathLabels;
         private Codec payloadCodec;
         private boolean isRequest;
@@ -186,7 +186,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
          * @param requestPathLabels Captured request labels.
          * @return Returns the builder.
          */
-        Builder requestPathLabels(Map<String, String> requestPathLabels) {
+        public Builder requestPathLabels(Map<String, String> requestPathLabels) {
             this.requestPathLabels = requestPathLabels;
             return this;
         }
@@ -197,7 +197,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
          * @param payloadCodec Payload codec.
          * @return Returns the builder.
          */
-        Builder payloadCodec(Codec payloadCodec) {
+        public Builder payloadCodec(Codec payloadCodec) {
             this.payloadCodec = payloadCodec;
             return this;
         }
@@ -208,7 +208,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
          * @param headers HTTP headers to set.
          * @return Returns the builder.
          */
-        Builder headers(HttpHeaders headers) {
+        public Builder headers(HttpHeaders headers) {
             this.headers = Objects.requireNonNull(headers);
             return this;
         }
@@ -222,7 +222,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
          * @param requestRawQueryString Query string.
          * @return Returns the builder.
          */
-        Builder requestRawQueryString(String requestRawQueryString) {
+        public Builder requestRawQueryString(String requestRawQueryString) {
             if (!isRequest) {
                 throw new IllegalStateException("Cannot set rawQueryString for a response");
             }
@@ -236,7 +236,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
          * @param body Payload to deserialize.
          * @return Returns the builder.
          */
-        Builder body(DataStream body) {
+        public Builder body(DataStream body) {
             this.body = body;
             return this;
         }
@@ -247,7 +247,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
          * @param requestPath Path of the request.
          * @return Returns the path.
          */
-        Builder requestPath(String requestPath) {
+        public Builder requestPath(String requestPath) {
             if (!isRequest) {
                 throw new IllegalStateException("Cannot set path for a response");
             }
@@ -261,7 +261,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
          * @param responseStatus Status to set.
          * @return Returns the builder.
          */
-        Builder responseStatus(int responseStatus) {
+        public Builder responseStatus(int responseStatus) {
             if (isRequest) {
                 throw new IllegalStateException("Cannot set status for a request");
             }
@@ -275,7 +275,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
          * @param isRequest Set to true to use request bindings.
          * @return Returns the builder.
          */
-        Builder request(boolean isRequest) {
+        public Builder request(boolean isRequest) {
             this.isRequest = isRequest;
             return this;
         }
@@ -286,7 +286,7 @@ final class HttpBindingDeserializer extends SpecificShapeDeserializer implements
          * @param shapeBuilder Shape builder to create a shape.
          * @return the builder.
          */
-        Builder shapeBuilder(ShapeBuilder<?> shapeBuilder) {
+        public Builder shapeBuilder(ShapeBuilder<?> shapeBuilder) {
             this.shapeBuilder = shapeBuilder;
             return this;
         }

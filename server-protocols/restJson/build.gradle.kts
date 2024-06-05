@@ -11,4 +11,6 @@ extra["moduleName"] = "software.amazon.smithy.java.server.protocols.restjson"
 dependencies {
     implementation(project(":server"))
     implementation(project(":server-core"))
+    implementation(project(":http-binding"))
+    implementation(project(":json-codec"))
 }
