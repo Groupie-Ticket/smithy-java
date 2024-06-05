@@ -14,14 +14,13 @@ import software.amazon.smithy.codegen.core.directed.GenerateServiceDirective;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.generators.IdStringGenerator;
-import software.amazon.smithy.java.codegen.generators.SchemaGenerator;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.server.ServerSymbolProperties;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
-import software.amazon.smithy.java.runtime.core.schema.SdkSchema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.Service;
+import software.amazon.smithy.java.server.ServiceSchema;
 import software.amazon.smithy.java.server.exceptions.UnknownOperationException;
 import software.amazon.smithy.model.knowledge.TopDownIndex;
 import software.amazon.smithy.model.shapes.OperationShape;
@@ -83,15 +82,21 @@ public class ServiceGenerator implements
             writer.putContext("serializableStruct", SerializableStruct.class);
             writer.putContext(
                 "schema",
-                new SchemaGenerator(writer, shape, directive.symbolProvider(), directive.model(), directive.context())
+                new ServiceSchemaGenerator(
+                    writer,
+                    shape,
+                    directive.symbolProvider(),
+                    directive.model(),
+                    directive.context()
+                )
             );
-            writer.putContext("sdkSchema", SdkSchema.class);
+            writer.putContext("serviceSchema", ServiceSchema.class);
             writer.write(
                 """
                     public final class ${service:T} implements ${serviceType:T} {
                         ${id:C|}
 
-                        private static final ${sdkSchema:T} SCHEMA = ${schema:C}
+                        private static final ${serviceSchema:T} SCHEMA = ${schema:C}
 
                         ${properties:C|}
 
@@ -105,7 +110,7 @@ public class ServiceGenerator implements
                         }
 
                         @Override
-                        public ${sdkSchema:T} getSchema() {
+                        public ${serviceSchema:T} getSchema() {
                             return SCHEMA;
                         }
                     }

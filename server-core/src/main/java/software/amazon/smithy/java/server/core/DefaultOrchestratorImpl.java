@@ -12,7 +12,6 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
-
 import software.amazon.smithy.java.server.Service;
 
 public class DefaultOrchestratorImpl implements Orchestrator {

@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.server.core;
 
+import java.nio.charset.StandardCharsets;
 import software.amazon.smithy.java.server.Service;
 
 
@@ -19,7 +20,7 @@ public class OperationHandler implements SyncHandler {
     @Override
     public void doBefore(Job job) {
         service.getOperation("GetBeer").function().apply(null, null);
-        job.getReply().setValue(new ByteValue("test".getBytes()));
+        job.getReply().setValue(new ByteValue("test".getBytes(StandardCharsets.UTF_8)));
         job.setDone();
 
     }

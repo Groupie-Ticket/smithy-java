@@ -1,6 +1,8 @@
 $version: "2.0"
 
+
 namespace smithy.java.codegen.server.test
+
 use aws.auth#sigv4
 use aws.protocols#restJson1
 
