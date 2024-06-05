@@ -5,12 +5,11 @@
 
 package software.amazon.smithy.java.server.core;
 
-import software.amazon.smithy.java.server.core.attributes.HttpAttributes;
-
 import java.net.http.HttpHeaders;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import software.amazon.smithy.java.server.core.attributes.HttpAttributes;
 
 public class HttpHandler implements SyncHandler {
     @Override

@@ -5,11 +5,13 @@
 
 package software.amazon.smithy.java.server.core;
 
-import java.nio.charset.StandardCharsets;
+import java.util.concurrent.CompletableFuture;
+import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.Service;
+import software.amazon.smithy.java.server.core.attributes.ServiceAttributes;
 
 
-public class OperationHandler implements SyncHandler {
+public class OperationHandler implements Handler {
 
     private final Service service;
 
@@ -18,15 +20,20 @@ public class OperationHandler implements SyncHandler {
     }
 
     @Override
-    public void doBefore(Job job) {
-        service.getOperation("GetBeer").function().apply(null, null);
-        job.getReply().setValue(new ByteValue("test".getBytes(StandardCharsets.UTF_8)));
-        job.setDone();
-
+    public CompletableFuture<Void> before(Job job) {
+        Operation<?, ?> operation = job.getRequest().getContext().get(ServiceAttributes.OPERATION);
+        CompletableFuture<Void> cf = new CompletableFuture<>();
+        if (operation.isAsync()) {
+            operation.asyncFunction().apply(null, null).thenRun(() -> cf.complete(null));
+        } else {
+            operation.function().apply(null, null);
+            cf.complete(null);
+        }
+        return cf;
     }
 
     @Override
-    public void doAfter(Job job) {
-
+    public CompletableFuture<Void> after(Job job) {
+        return CompletableFuture.completedFuture(null);
     }
 }

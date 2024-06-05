@@ -12,14 +12,14 @@ import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.HttpHeaders.Names;
+import java.net.URI;
 import java.net.http.HttpHeaders;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-
-import io.netty.handler.codec.http.HttpHeaders.Names;
 import software.amazon.smithy.java.server.core.*;
 import software.amazon.smithy.java.server.core.attributes.HttpAttributes;
 
@@ -52,9 +52,15 @@ final class NettyHandler extends ChannelDuplexHandler {
             content.readBytes(buffer);
             content.release();
             request.setValue(new ByteValue(buffer));
-            setHeaders(request, fullHttpRequest);
+            setCommonAttributes(request, fullHttpRequest);
         }
         return request;
+    }
+
+    private void setCommonAttributes(Request request, FullHttpRequest fullHttpRequest) {
+        var context = request.getContext();
+        setHeaders(request, fullHttpRequest);
+        context.put(HttpAttributes.HTTP_URI, URI.create(fullHttpRequest.uri()));
     }
 
     //TODO Fix this after we decide on a header implementation
@@ -76,7 +82,11 @@ final class NettyHandler extends ChannelDuplexHandler {
             try {
                 ByteValue byteValue = job.getReply().getValue();
                 ByteBuf content = Unpooled.wrappedBuffer(byteValue.value());
-                HttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, content);
+                HttpResponse response = new DefaultFullHttpResponse(
+                    HttpVersion.HTTP_1_1,
+                    HttpResponseStatus.OK,
+                    content
+                );
                 setHeaders(job.getReply(), response);
                 response.headers().set(Names.CONTENT_LENGTH, content.readableBytes());
                 channel.writeAndFlush(response);
