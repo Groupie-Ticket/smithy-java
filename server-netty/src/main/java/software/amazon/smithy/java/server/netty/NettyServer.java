@@ -19,8 +19,10 @@ import java.net.URI;
 import java.util.List;
 import java.util.function.Consumer;
 import software.amazon.smithy.java.server.Server;
+import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.java.server.core.DefaultOrchestratorImpl;
 import software.amazon.smithy.java.server.core.Orchestrator;
+import software.amazon.smithy.java.server.core.ProtocolResolver;
 
 final class NettyServer implements Server {
 
@@ -31,9 +33,10 @@ final class NettyServer implements Server {
 
     NettyServer(NettyServerBuilder builder) {
         var bootstrap = new ServerBootstrap();
+        Service service = builder.services.get(0); //FIXME support only 1 service for now.
 
-        Orchestrator orch = new DefaultOrchestratorImpl(builder.services.get(0), builder.numWorkers, List.of());
-        NettyHandler handler = new NettyHandler(orch);
+        Orchestrator orch = new DefaultOrchestratorImpl(service, builder.numWorkers, List.of());
+        NettyHandler handler = new NettyHandler(orch, new ProtocolResolver(service));
         Consumer<ChannelPipeline> handlerInstaller = (pipeline) -> {
             pipeline.addLast(handler);
         };

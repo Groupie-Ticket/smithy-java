@@ -19,7 +19,7 @@ public class HttpHandler implements SyncHandler {
 
     @Override
     public void doAfter(Job job) {
-        Reply reply = job.getReply();
+        Reply reply = job.reply();
         Map<String, List<String>> header = new HashMap<>();
 
         reply.getContext().put(HttpAttributes.HTTP_HEADERS, HttpHeaders.of(header, (k, v) -> true));

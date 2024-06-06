@@ -21,16 +21,15 @@ import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.java.server.core.ByteValue;
 import software.amazon.smithy.java.server.core.Job;
-import software.amazon.smithy.java.server.core.ServerProtocolHandler;
+import software.amazon.smithy.java.server.core.ResolutionRequest;
+import software.amazon.smithy.java.server.core.ServerProtocol;
 import software.amazon.smithy.java.server.core.ShapeValue;
 import software.amazon.smithy.java.server.core.attributes.HttpAttributes;
-import software.amazon.smithy.java.server.core.attributes.ServiceAttributes;
-import software.amazon.smithy.java.server.exceptions.UnknownOperationException;
 import software.amazon.smithy.model.pattern.UriPattern;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.HttpTrait;
 
-final class RestJsonProtocolHandler extends ServerProtocolHandler {
+final class RestJsonProtocolHandler extends ServerProtocol {
 
     private final List<Operation<?, ?>> operations = new ArrayList<>();
     private final Codec codec;
@@ -46,13 +45,8 @@ final class RestJsonProtocolHandler extends ServerProtocolHandler {
     }
 
     @Override
-    public void doBefore(Job job) {
-        if (!claim(job)) {
-            return;
-        }
-
-        String path = job.getRequest().getContext().get(HttpAttributes.HTTP_URI).getPath();
-        var headers = job.getRequest().getContext().get(HttpAttributes.HTTP_HEADERS);
+    public Operation<?, ?> resolveOperation(ResolutionRequest request) {
+        String path = request.getUri().getPath();
         UriPattern uri = UriPattern.parse(path);
         Operation<?, ?> selectedOperation = null;
         for (Operation<?, ?> operation : operations) {
@@ -62,36 +56,29 @@ final class RestJsonProtocolHandler extends ServerProtocolHandler {
                 break;
             }
         }
+        return selectedOperation;
+    }
 
-        if (selectedOperation == null) {
-            throw new UnknownOperationException("Unknown operation: " + uri);
-        }
-
-        job.getRequest().getContext().put(ServiceAttributes.OPERATION, selectedOperation);
-        ByteValue requestBody = job.getRequest().getValue();
-        ShapeBuilder<? extends SerializableStruct> shapeBuilder = selectedOperation.getApiOperation().inputBuilder();
+    @Override
+    public void deserializeInput(Job job) {
+        ByteValue requestBody = job.request().getValue();
+        ShapeBuilder<? extends SerializableStruct> shapeBuilder = job.operation().getApiOperation().inputBuilder();
         HttpBindingDeserializer deserializer = HttpBindingDeserializer.builder()
             .request(true)
             .body(DataStream.ofBytes(requestBody.get()))
             .payloadCodec(codec)
             .shapeBuilder(shapeBuilder)
-            .requestPath(path)
-            .headers(headers)
+            .requestPath(job.request().getContext().get(HttpAttributes.HTTP_URI).getPath())
+            .headers(job.request().getContext().get(HttpAttributes.HTTP_HEADERS))
             .build();
-        job.getRequest().setValue(new ShapeValue<>(shapeBuilder.deserialize(deserializer).build()));
+        job.request().setValue(new ShapeValue<>(shapeBuilder.deserialize(deserializer).build()));
 
     }
 
     @Override
-    public void doAfter(Job job) {
-        if (!isClaimedByThis(job) || job.getFailure().isPresent()) {
-            return;
-        }
-        ApiOperation<?, ?> sdkOperation = job.getRequest()
-            .getContext()
-            .get(ServiceAttributes.OPERATION)
-            .getApiOperation();
-        ShapeValue<? extends SerializableStruct> shapeValue = job.getReply().getValue();
+    public void serializeOutput(Job job) {
+        ApiOperation<?, ?> sdkOperation = job.operation().getApiOperation();
+        ShapeValue<? extends SerializableStruct> shapeValue = job.reply().getValue();
         HttpBindingSerializer serializer = new HttpBindingSerializer(
             null,
             codec,
@@ -102,7 +89,7 @@ final class RestJsonProtocolHandler extends ServerProtocolHandler {
         serializer.flush();
         DataStream dataStream = serializer.getBody();
         try {
-            job.getReply().setValue(new ByteValue(dataStream.asBytes().toCompletableFuture().get()));
+            job.reply().setValue(new ByteValue(dataStream.asBytes().toCompletableFuture().get()));
         } catch (InterruptedException | ExecutionException e) {
             throw new RuntimeException(e);
         }

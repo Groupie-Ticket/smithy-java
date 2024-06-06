@@ -9,7 +9,6 @@ import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.Service;
-import software.amazon.smithy.java.server.core.attributes.ServiceAttributes;
 
 
 public class OperationHandler implements Handler {
@@ -22,8 +21,8 @@ public class OperationHandler implements Handler {
 
     @Override
     public CompletableFuture<Void> before(Job job) {
-        Operation operation = job.getRequest().getContext().get(ServiceAttributes.OPERATION);
-        ShapeValue<? extends SerializableStruct> requestValue = job.getRequest().getValue();
+        Operation operation = job.operation();
+        ShapeValue<? extends SerializableStruct> requestValue = job.request().getValue();
         SerializableStruct input = requestValue.get();
         CompletableFuture<Void> cf = new CompletableFuture<>();
         if (operation.isAsync()) {
@@ -31,12 +30,12 @@ public class OperationHandler implements Handler {
                 .asyncFunction()
                 .apply(input, null);
             response.whenComplete((result, error) -> {
-                job.getReply().setValue(new ShapeValue<>(result));
+                job.reply().setValue(new ShapeValue<>(result));
                 cf.complete(null);
             });
         } else {
             SerializableStruct output = (SerializableStruct) operation.function().apply(input, null);
-            job.getReply().setValue(new ShapeValue<>(output));
+            job.reply().setValue(new ShapeValue<>(output));
             cf.complete(null);
         }
         return cf;

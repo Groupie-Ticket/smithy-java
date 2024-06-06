@@ -5,22 +5,19 @@
 
 package software.amazon.smithy.java.server.core;
 
-import software.amazon.smithy.java.runtime.core.Context;
-import software.amazon.smithy.model.shapes.ShapeId;
+public final class ServerProtocolHandler implements SyncHandler {
 
-public abstract class ServerProtocolHandler implements SyncHandler {
-
-    private static final Context.Key<Handler> PROTOCOL_HANDLER = Context.key("protocol-handler");
-
-    public abstract ShapeId getProtocolId();
-
-    protected boolean claim(Job job) {
-        return job.getContext().putIfAbsent(PROTOCOL_HANDLER, this) == null;
+    @Override
+    public void doBefore(Job job) {
+        if (job.request().getValue().getClass() == ByteValue.class) {
+            job.chosenProtocol().deserializeInput(job);
+        }
     }
 
-    protected boolean isClaimedByThis(Job job) {
-        return job.getContext().get(PROTOCOL_HANDLER) == this;
+    @Override
+    public void doAfter(Job job) {
+        if (job.reply().getValue().getClass() == ShapeValue.class) {
+            job.chosenProtocol().serializeOutput(job);
+        }
     }
-
-
 }

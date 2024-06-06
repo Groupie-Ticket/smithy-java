@@ -40,14 +40,7 @@ public class DefaultOrchestratorImpl implements Orchestrator {
         List<Handler> handlers = new ArrayList<>();
         handlers.addAll(endpointHandlers);
         handlers.add(new HttpHandler());
-        handlers.addAll(
-            service.getSchema()
-                .getSupportedProtocols()
-                .stream()
-                .map(ServerProtocolsIndex::getServerProtocolHandler)
-                .map(p -> p.provideProtocolHandler(service))
-                .toList()
-        );
+        handlers.add(new ServerProtocolHandler());
         handlers.add(new OperationHandler(service));
         return handlers.stream().map(LoggingHandler::new).map(Handler.class::cast).toList();
     }
