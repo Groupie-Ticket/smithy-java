@@ -11,7 +11,9 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.DefaultHttpResponse;
+import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaders.Names;
@@ -32,6 +34,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
+import java.util.concurrent.atomic.AtomicReference;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.server.core.ByteValue;
 import software.amazon.smithy.java.server.core.Job;
@@ -195,7 +198,38 @@ final class NettyHandler extends ChannelDuplexHandler {
                         );
                     }
                     setHeaders(job.reply(), response);
-                    channel.writeAndFlush(response);
+                    channel.writeAndFlush(response).addListener(f -> {
+                        if (f.isSuccess() && job.reply().getValue() instanceof ReactiveByteValue reactiveByteValue) {
+                            AtomicReference<Flow.Subscription> sub = new AtomicReference<>();
+                            reactiveByteValue.get().subscribe(new Flow.Subscriber<>() {
+                                @Override
+                                public void onSubscribe(Flow.Subscription s) {
+                                    sub.set(s);
+                                    s.request(1);
+                                }
+
+                                @Override
+                                public void onNext(ByteBuffer item) {
+                                    channel.writeAndFlush(new DefaultHttpContent(Unpooled.wrappedBuffer(item)))
+                                        .addListener(f -> {
+                                            if (f.isSuccess()) {
+                                                sub.get().request(1);
+                                            }
+                                        });
+                                }
+
+                                @Override
+                                public void onError(Throwable throwable) {
+                                    channel.close();
+                                }
+
+                                @Override
+                                public void onComplete() {
+                                    channel.writeAndFlush(new DefaultLastHttpContent());
+                                }
+                            });
+                        }
+                    });
                 } catch (Exception e) {
                     job.setFailure(e);
                     sendErrorResponse(e, channel);
