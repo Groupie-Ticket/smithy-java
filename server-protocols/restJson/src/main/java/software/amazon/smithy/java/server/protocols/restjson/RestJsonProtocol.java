@@ -21,9 +21,11 @@ import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.java.server.core.ByteValue;
 import software.amazon.smithy.java.server.core.Job;
+import software.amazon.smithy.java.server.core.ReactiveByteValue;
 import software.amazon.smithy.java.server.core.ResolutionRequest;
 import software.amazon.smithy.java.server.core.ServerProtocol;
 import software.amazon.smithy.java.server.core.ShapeValue;
+import software.amazon.smithy.java.server.core.Value;
 import software.amazon.smithy.java.server.core.attributes.HttpAttributes;
 import software.amazon.smithy.model.pattern.UriPattern;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -61,11 +63,10 @@ final class RestJsonProtocol extends ServerProtocol {
 
     @Override
     public void deserializeInput(Job job) {
-        ByteValue requestBody = job.request().getValue();
         ShapeBuilder<? extends SerializableStruct> shapeBuilder = job.operation().getApiOperation().inputBuilder();
         HttpBindingDeserializer deserializer = HttpBindingDeserializer.builder()
             .request(true)
-            .body(DataStream.ofBytes(requestBody.get()))
+            .body(getDataStream(job.request().getValue()))
             .payloadCodec(codec)
             .shapeBuilder(shapeBuilder)
             .requestPath(job.request().getContext().get(HttpAttributes.HTTP_URI).getPath())
@@ -73,6 +74,16 @@ final class RestJsonProtocol extends ServerProtocol {
             .build();
         job.request().setValue(new ShapeValue<>(shapeBuilder.deserialize(deserializer).build()));
 
+    }
+
+    private DataStream getDataStream(Value value) {
+        if (value instanceof ByteValue bv) {
+            return DataStream.ofBytes(bv.get());
+        } else if (value instanceof ReactiveByteValue rbv) {
+            return DataStream.ofInputStream(new ReactiveInputStreamAdapter(rbv.get()));
+        } else {
+            throw new IllegalStateException("Unexpected type: " + value.getClass());
+        }
     }
 
     @Override

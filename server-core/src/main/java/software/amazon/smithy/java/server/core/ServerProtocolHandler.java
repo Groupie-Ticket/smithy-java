@@ -9,7 +9,8 @@ public final class ServerProtocolHandler implements SyncHandler {
 
     @Override
     public void doBefore(Job job) {
-        if (job.request().getValue().getClass() == ByteValue.class) {
+        if (job.request().getValue().getClass() == ByteValue.class
+            || job.request().getValue().getClass() == ReactiveByteValue.class) {
             job.chosenProtocol().deserializeInput(job);
         }
     }

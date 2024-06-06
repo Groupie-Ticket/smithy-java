@@ -1,3 +1,8 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 package software.amazon.smithy.java.codegen.generators;
 
 import java.util.function.Consumer;
@@ -15,6 +20,8 @@ import software.amazon.smithy.java.runtime.core.schema.TypeRegistry;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
+import software.amazon.smithy.model.shapes.Shape;
+import software.amazon.smithy.model.traits.StreamingTrait;
 
 
 public class OperationGenerator
@@ -35,13 +42,17 @@ public class OperationGenerator
         directive.context()
             .writerDelegator()
             .useFileWriter(symbol.getDeclarationFile(), symbol.getNamespace(), writer -> {
-                var input = directive.symbolProvider().toSymbol(directive.model().expectShape(shape.getInputShape()));
-                var output = directive.symbolProvider().toSymbol(directive.model().expectShape(shape.getOutputShape()));
+                var inputShape = directive.model().expectShape(shape.getInputShape());
+                var input = directive.symbolProvider().toSymbol(inputShape);
+                var outputShape = directive.model().expectShape(shape.getOutputShape());
+                var output = directive.symbolProvider().toSymbol(outputShape);
                 writer.pushState(new ClassSection(shape));
                 writer.putContext("shape", symbol);
                 writer.putContext("sdkOperation", ApiOperation.class);
                 writer.putContext("inputType", input);
+                writer.putContext("streamingInput", hasStream(directive.model(), inputShape));
                 writer.putContext("outputType", output);
+                writer.putContext("streamingOutput", hasStream(directive.model(), outputShape));
                 writer.putContext("sdkSchema", Schema.class);
                 writer.putContext("sdkShapeBuilder", ShapeBuilder.class);
                 writer.putContext("typeRegistry", TypeRegistry.class);
@@ -94,8 +105,18 @@ public class OperationGenerator
                             }
 
                             @Override
+                            public boolean streamingInput() {
+                                return ${streamingInput:L};
+                            }
+
+                            @Override
                             public ${sdkSchema:T} outputSchema() {
                                 return ${outputType:T}.SCHEMA;
+                            }
+
+                            @Override
+                            public boolean streamingOutput() {
+                                return ${streamingOutput:L};
                             }
 
                             @Override
@@ -107,6 +128,12 @@ public class OperationGenerator
                 );
                 writer.popState();
             });
+    }
+
+    private boolean hasStream(Model model, Shape shape) {
+        return shape.members()
+            .stream()
+            .anyMatch(member -> member.getMemberTrait(model, StreamingTrait.class).isPresent());
     }
 
 
