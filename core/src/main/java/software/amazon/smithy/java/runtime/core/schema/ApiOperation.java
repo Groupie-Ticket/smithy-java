@@ -41,11 +41,21 @@ public interface ApiOperation<I extends SerializableStruct, O extends Serializab
     Schema inputSchema();
 
     /**
+     * @return true if the input has a payload or event stream.
+     */
+    boolean streamingInput();
+
+    /**
      * Get the output structure schema.
      *
      * @return Returns the output schema.
      */
     Schema outputSchema();
+
+    /**
+     * true if the output has a payload or event stream.
+     */
+    boolean streamingOutput();
 
     /**
      * Get a type registry for the operation used to create errors and output types.

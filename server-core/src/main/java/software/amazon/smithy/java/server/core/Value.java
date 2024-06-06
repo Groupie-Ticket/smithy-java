@@ -5,7 +5,7 @@
 
 package software.amazon.smithy.java.server.core;
 
-public sealed interface Value<T> permits ByteValue, ShapeValue {
+public sealed interface Value<T> permits ByteValue, ReactiveByteValue, ShapeValue {
 
     T get();
 }

@@ -26,3 +26,7 @@ tasks {
         enabled = false
     }
 }
+
+java.sourceSets["main"].java {
+    srcDirs("model", "src/main/smithy")
+}

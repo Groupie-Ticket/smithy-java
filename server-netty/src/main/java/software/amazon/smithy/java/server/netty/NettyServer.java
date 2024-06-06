@@ -36,9 +36,8 @@ final class NettyServer implements Server {
         Service service = builder.services.get(0); //FIXME support only 1 service for now.
 
         Orchestrator orch = new DefaultOrchestratorImpl(service, builder.numWorkers, List.of());
-        NettyHandler handler = new NettyHandler(orch, new ProtocolResolver(service));
         Consumer<ChannelPipeline> handlerInstaller = (pipeline) -> {
-            pipeline.addLast(handler);
+            pipeline.addLast(new NettyHandler(orch, new ProtocolResolver(service)));
         };
 
         bootstrap.childHandler(new NettyChannelInitializer(handlerInstaller));

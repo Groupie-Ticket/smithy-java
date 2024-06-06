@@ -10,7 +10,7 @@ use aws.protocols#restJson1
 @restJson1
 service TestService {
     version: "today"
-    operations: [GetBeer, Echo]
+    operations: [GetBeer, Echo, HashFile]
 }
 
 @http(method: "POST", uri: "/get-beer")
@@ -36,6 +36,22 @@ operation Echo {
     input: EchoInput
     output: EchoOutput
 }
+
+@http(method: "POST", uri: "/hash")
+operation HashFile {
+    input:= {
+        @httpPayload
+        @required
+        payload: FileStream
+    }
+
+    output:= {
+        hashcode: String
+    }
+}
+
+@streaming
+blob FileStream
 
 structure EchoInput {
     value: EchoPayload
