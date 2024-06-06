@@ -28,9 +28,11 @@ import software.amazon.smithy.java.server.core.attributes.HttpAttributes;
 final class NettyHandler extends ChannelDuplexHandler {
 
     private final Orchestrator orchestrator;
+    private final ProtocolResolver protocolResolver;
 
-    NettyHandler(Orchestrator orchestrator) {
+    NettyHandler(Orchestrator orchestrator, ProtocolResolver protocolResolver) {
         this.orchestrator = orchestrator;
+        this.protocolResolver = protocolResolver;
     }
 
 
@@ -38,8 +40,19 @@ final class NettyHandler extends ChannelDuplexHandler {
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         if (msg instanceof FullHttpRequest httpRequest) {
             Channel channel = ctx.channel();
+            URI uri = URI.create(httpRequest.uri());
+            HttpHeaders headers = getHeaders(httpRequest);
+            var operationProtocolPair = protocolResolver.resolveOperation(
+                ResolutionRequest
+                    .builder()
+                    .uri(uri)
+                    .headers(headers)
+                    .build()
+            );
             Request request = createRequest(httpRequest, channel);
-            Job job = new JobImpl(request, new ReplyImpl());
+            request.getContext().put(HttpAttributes.HTTP_HEADERS, headers);
+            request.getContext().put(HttpAttributes.HTTP_URI, uri);
+            Job job = new JobImpl(request, new ReplyImpl(), operationProtocolPair.left, operationProtocolPair.right);
             writeResponse(channel, orchestrator.enqueue(job));
         }
     }
@@ -53,24 +66,17 @@ final class NettyHandler extends ChannelDuplexHandler {
             content.readBytes(buffer);
             content.release();
             request.setValue(new ByteValue(buffer));
-            setCommonAttributes(request, fullHttpRequest);
         }
         return request;
     }
 
-    private void setCommonAttributes(Request request, FullHttpRequest fullHttpRequest) {
-        var context = request.getContext();
-        setHeaders(request, fullHttpRequest);
-        context.put(HttpAttributes.HTTP_URI, URI.create(fullHttpRequest.uri()));
-    }
-
     //TODO Fix this after we decide on a header implementation
-    private void setHeaders(Request request, FullHttpRequest fullHttpRequest) {
+    private HttpHeaders getHeaders(FullHttpRequest fullHttpRequest) {
         Map<String, List<String>> headers = new HashMap<>();
         for (String header : fullHttpRequest.headers().names()) {
             headers.put(header, fullHttpRequest.headers().getAll(header));
         }
-        request.getContext().put(HttpAttributes.HTTP_HEADERS, HttpHeaders.of(headers, (k, v) -> true));
+        return HttpHeaders.of(headers, (k, v) -> true);
     }
 
     //TODO Fix this after we decide on a header implementation
@@ -86,14 +92,14 @@ final class NettyHandler extends ChannelDuplexHandler {
                         sendErrorResponse(job.getFailure().get(), channel);
                         return;
                     }
-                    ByteValue byteValue = job.getReply().getValue();
+                    ByteValue byteValue = job.reply().getValue();
                     ByteBuf content = Unpooled.wrappedBuffer(byteValue.get());
                     HttpResponse response = new DefaultFullHttpResponse(
                         HttpVersion.HTTP_1_1,
                         HttpResponseStatus.OK,
                         content
                     );
-                    setHeaders(job.getReply(), response);
+                    setHeaders(job.reply(), response);
                     response.headers().set(Names.CONTENT_LENGTH, content.readableBytes());
                     channel.writeAndFlush(response);
                 } catch (Exception e) {

@@ -7,14 +7,16 @@ package software.amazon.smithy.java.server.core;
 
 import java.util.Optional;
 import software.amazon.smithy.java.runtime.core.Context;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.server.Operation;
 
 public sealed interface Job permits JobImpl {
 
-    Request getRequest();
+    Request request();
 
-    Reply getReply();
+    Reply reply();
 
-    Context getContext();
+    Context context();
 
     boolean isDone();
 
@@ -23,5 +25,9 @@ public sealed interface Job permits JobImpl {
     Optional<Throwable> getFailure();
 
     void setFailure(Throwable t);
+
+    Operation<? extends SerializableStruct, ? extends SerializableStruct> operation();
+
+    ServerProtocol chosenProtocol();
 
 }

@@ -8,7 +8,7 @@ package software.amazon.smithy.java.server.core;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.model.shapes.ShapeId;
 
-public interface ServerProtocolHandlerProvider<T extends ServerProtocolHandler> {
+public interface ServerProtocolProvider<T extends ServerProtocol> {
 
     T provideProtocolHandler(Service service);
 
