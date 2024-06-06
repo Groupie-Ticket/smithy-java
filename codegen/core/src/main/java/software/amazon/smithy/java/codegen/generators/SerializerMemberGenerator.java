@@ -70,8 +70,8 @@ final class SerializerMemberGenerator extends ShapeVisitor.DataShapeVisitor<Void
 
     @Override
     public Void blobShape(BlobShape blobShape) {
-        // Streaming Blobs do not generate a member serializer
         if (CodegenUtils.isStreamingBlob(blobShape)) {
+            writer.write("serializer.writeDataStream(${schema:L}, ${state:L})");
             return null;
         }
         writer.write("serializer.writeBlob(${schema:L}, ${state:L})");

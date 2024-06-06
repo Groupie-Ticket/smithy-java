@@ -133,6 +133,11 @@ public final class ListSerializer implements ShapeSerializer {
     }
 
     @Override
+    public void writeDataStream(Schema schema, DataStream value) {
+        throw new UnsupportedOperationException("Cannot write a list of streams");
+    }
+
+    @Override
     public void writeTimestamp(Schema schema, Instant value) {
         beforeWrite();
         delegate.writeTimestamp(schema, value);

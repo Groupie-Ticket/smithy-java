@@ -103,6 +103,11 @@ public abstract class SpecificShapeSerializer implements ShapeSerializer {
     }
 
     @Override
+    public void writeDataStream(Schema schema, DataStream value) {
+        throw throwForInvalidState(schema);
+    }
+
+    @Override
     public void writeTimestamp(Schema schema, Instant value) {
         throw throwForInvalidState(schema);
     }

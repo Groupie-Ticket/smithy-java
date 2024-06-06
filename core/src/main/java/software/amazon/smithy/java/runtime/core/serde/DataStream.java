@@ -8,6 +8,7 @@ package software.amazon.smithy.java.runtime.core.serde;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.net.http.HttpRequest;
 import java.nio.ByteBuffer;
@@ -16,7 +17,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executor;
 import java.util.concurrent.Flow;
+import java.util.concurrent.ForkJoinPool;
+import java.util.function.Consumer;
 
 /**
  * Abstraction for reading streams of data.
@@ -64,6 +68,35 @@ public interface DataStream extends Flow.Publisher<ByteBuffer> {
      */
     static DataStream ofInputStream(InputStream inputStream) {
         return ofInputStream(inputStream, null);
+    }
+
+    /**
+     * {@link #ofOutputStream(Consumer, Executor)} using {@link ForkJoinPool#commonPool()} as the executor.
+     *
+     * @param outputStreamConsumer a callback that receives an OutputStream and writes to it and then closes it.
+     * @return a DataStream that will begin to pump bytes upon subscription
+     */
+    static DataStream ofOutputStream(Consumer<OutputStream> outputStreamConsumer) {
+        return new OutputDataStream(outputStreamConsumer, ForkJoinPool.commonPool());
+    }
+
+    /**
+     * Create a DataStream from a callback for an OutputStream.
+     * <p>
+     * Unlike an InputStream, an OutputStream is generally written to in a blocking manner until the end of the input
+     * is reached. This is generally the opposite of the goal of a DataStream, where streaming of data is deferred until
+     * the client or endpoint is ready to transfer bytes. By taking a consumer and an Executor, we can defer writes to
+     * the OutputStream until this DataStream is subscribed to, and the writes will not block the subscribing thread.
+     * <p>
+     * The Consumer <em>must</em> close the OutputStream or throw a runtime exception to indicate failure. Anything
+     * else may result in deadlock.
+     *
+     * @param outputStreamConsumer a callback that receives an OutputStream and writes to it and then closes it.
+     * @param executor an executor for the outputStreamConsumer to be called upon.
+     * @return a DataStream that will begin to pump bytes upon subscription
+     */
+    static DataStream ofOutputStream(Consumer<OutputStream> outputStreamConsumer, Executor executor) {
+        return new OutputDataStream(outputStreamConsumer, executor);
     }
 
     /**

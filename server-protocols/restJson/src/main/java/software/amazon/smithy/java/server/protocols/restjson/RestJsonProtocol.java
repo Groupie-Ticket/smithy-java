@@ -100,10 +100,15 @@ final class RestJsonProtocol extends ServerProtocol {
         serializer.flush();
         DataStream dataStream = serializer.getBody();
         job.reply().context().put(HttpAttributes.HTTP_HEADERS, serializer.getHeaders());
-        try {
-            job.reply().setValue(new ByteValue(dataStream.asBytes().toCompletableFuture().get()));
-        } catch (InterruptedException | ExecutionException e) {
-            throw new RuntimeException(e);
+
+        if (sdkOperation.streamingOutput()) {
+            job.reply().setValue(new ReactiveByteValue(serializer.getBody()));
+        } else {
+            try {
+                job.reply().setValue(new ByteValue(dataStream.asBytes().toCompletableFuture().get()));
+            } catch (InterruptedException | ExecutionException e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 }
