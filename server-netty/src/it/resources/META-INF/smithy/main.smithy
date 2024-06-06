@@ -16,7 +16,7 @@ service TestService {
 @http(method: "POST", uri: "/get-beer")
 operation GetBeer {
     input:= {
-        @httpHeader("X-Id")
+        @httpHeader("X-Beer-Input-Id")
         @required
         id: Long
     }
@@ -24,6 +24,10 @@ operation GetBeer {
         @required
         @httpPayload
         value: Beer
+
+        @required
+        @httpHeader("X-Beer-Output-Id")
+        beerId: Long
     }
 }
 
@@ -50,7 +54,6 @@ structure EchoPayload {
 
 structure Beer {
     name: String
-    id: Long
 }
 
 list BeerList {

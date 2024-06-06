@@ -1,1 +1,1 @@
-software.amazon.smithy.java.server.protocols.restjson.RestJsonProtocolHandlerProvider
+software.amazon.smithy.java.server.protocols.restjson.RestJsonProtocolProvider

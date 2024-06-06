@@ -9,11 +9,11 @@ import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.java.server.core.ServerProtocolProvider;
 import software.amazon.smithy.model.shapes.ShapeId;
 
-public class RestJsonProtocolHandlerProvider implements ServerProtocolProvider<RestJsonProtocolHandler> {
+public class RestJsonProtocolProvider implements ServerProtocolProvider<RestJsonProtocol> {
 
     @Override
-    public RestJsonProtocolHandler provideProtocolHandler(Service service) {
-        return new RestJsonProtocolHandler(service);
+    public RestJsonProtocol provideProtocolHandler(Service service) {
+        return new RestJsonProtocol(service);
     }
 
     @Override

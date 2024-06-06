@@ -9,7 +9,7 @@ import software.amazon.smithy.java.runtime.core.Context;
 
 public sealed interface Reply permits ReplyImpl {
 
-    Context getContext();
+    Context context();
 
     <T extends Value> T getValue();
 

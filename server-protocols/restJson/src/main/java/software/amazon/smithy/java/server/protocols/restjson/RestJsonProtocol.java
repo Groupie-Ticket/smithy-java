@@ -29,12 +29,12 @@ import software.amazon.smithy.model.pattern.UriPattern;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.HttpTrait;
 
-final class RestJsonProtocolHandler extends ServerProtocol {
+final class RestJsonProtocol extends ServerProtocol {
 
     private final List<Operation<?, ?>> operations = new ArrayList<>();
     private final Codec codec;
 
-    public RestJsonProtocolHandler(final Service service) {
+    public RestJsonProtocol(final Service service) {
         this.operations.addAll(service.getAllOperations());
         this.codec = JsonCodec.builder().useJsonName(true).useTimestampFormat(true).build();
     }
@@ -88,6 +88,7 @@ final class RestJsonProtocolHandler extends ServerProtocol {
         serializer.writeStruct(sdkOperation.outputSchema(), shapeValue.get());
         serializer.flush();
         DataStream dataStream = serializer.getBody();
+        job.reply().context().put(HttpAttributes.HTTP_HEADERS, serializer.getHeaders());
         try {
             job.reply().setValue(new ByteValue(dataStream.asBytes().toCompletableFuture().get()));
         } catch (InterruptedException | ExecutionException e) {
