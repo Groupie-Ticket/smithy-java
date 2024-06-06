@@ -81,7 +81,9 @@ final class NettyHandler extends ChannelDuplexHandler {
 
     //TODO Fix this after we decide on a header implementation
     private static void setHeaders(Reply reply, HttpResponse response) {
-        reply.getContext().get(HttpAttributes.HTTP_HEADERS).map().forEach(response.headers()::set);
+        for (var entry : reply.context().get(HttpAttributes.HTTP_HEADERS).map().entrySet()) {
+            response.headers().add(entry.getKey(), entry.getValue());
+        }
     }
 
     private static void writeResponse(Channel channel, CompletableFuture<Job> future) {
@@ -100,7 +102,7 @@ final class NettyHandler extends ChannelDuplexHandler {
                         content
                     );
                     setHeaders(job.reply(), response);
-                    response.headers().set(Names.CONTENT_LENGTH, content.readableBytes());
+                    response.headers().add(Names.CONTENT_LENGTH, content.readableBytes());
                     channel.writeAndFlush(response);
                 } catch (Exception e) {
                     job.setFailure(e);
@@ -120,7 +122,7 @@ final class NettyHandler extends ChannelDuplexHandler {
             HttpResponseStatus.INTERNAL_SERVER_ERROR,
             content
         );
-        response.headers().set(Names.CONTENT_LENGTH, content.readableBytes());
+        response.headers().add(Names.CONTENT_LENGTH, content.readableBytes());
         channel.writeAndFlush(response);
     }
 

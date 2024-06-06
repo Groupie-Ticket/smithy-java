@@ -29,7 +29,7 @@ class NettyServerTest {
         @Override
         public GetBeerOutput getBeer(GetBeerInput input, RequestContext context) {
             System.out.println("Beer invoked");
-            return GetBeerOutput.builder().value(Beer.builder().id(input.id()).name("Test Beer").build()).build();
+            return GetBeerOutput.builder().value(Beer.builder().name("Test Beer").build()).beerId(input.id()).build();
         }
     }
 

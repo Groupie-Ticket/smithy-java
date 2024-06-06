@@ -17,7 +17,7 @@ public final class ReplyImpl implements Reply {
     }
 
     @Override
-    public Context getContext() {
+    public Context context() {
         return context;
     }
 
