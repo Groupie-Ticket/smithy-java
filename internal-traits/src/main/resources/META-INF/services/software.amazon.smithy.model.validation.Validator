@@ -1,0 +1,2 @@
+software.amazon.smithy.protocol.traits.HierarchicalIdxTraitValidator
+software.amazon.smithy.protocol.traits.IndexedServiceTraitValidator
