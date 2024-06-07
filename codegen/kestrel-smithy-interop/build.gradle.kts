@@ -3,14 +3,13 @@ plugins {
     id("smithy-java.integ-test-conventions")
 }
 
-description = "This module provides the codegen functionality for Smithy Kestrel"
+description = "This module provides the core codegen functionality for Smithy java"
 group = "software.amazon.smithy.java.codegen"
 
-extra["displayName"] = "Smithy :: Java :: Codegen :: Kestrel"
+extra["displayName"] = "Smithy :: Java :: Codegen :: Core"
 extra["moduleName"] = "software.amazon.smithy.java.codegen"
 
 dependencies {
     implementation(libs.smithy.codegen)
-    implementation(project(":internal-traits"))
-    implementation(project(":kestrel-codec"))
+    implementation(project(":codegen:kestrel"))
 }
