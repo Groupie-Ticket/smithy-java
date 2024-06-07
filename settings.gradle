@@ -45,4 +45,7 @@ include 'server-protocols'
 include 'server-protocols:restJson'
 findProject(':server-protocols:restJson')?.name = 'restJson'
 include 'kestrel-codec'
+include 'codegen:kestrel'
+findProject(':codegen:kestrel')?.name = 'kestrel'
+include 'internal-traits'
 
