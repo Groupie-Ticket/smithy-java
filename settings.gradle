@@ -48,4 +48,6 @@ include 'kestrel-codec'
 include 'codegen:kestrel'
 findProject(':codegen:kestrel')?.name = 'kestrel'
 include 'internal-traits'
+include 'codegen:kestrel-smithy-interop'
+findProject(':codegen:kestrel-smithy-interop')?.name = 'kestrel-smithy-interop'
 
