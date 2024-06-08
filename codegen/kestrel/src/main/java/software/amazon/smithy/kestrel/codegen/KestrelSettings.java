@@ -15,20 +15,17 @@ public final class KestrelSettings {
 
     private ShapeId service;
 
+    private KestrelSettings(ShapeId service) {
+        this.service = service;
+    }
+
     public static KestrelSettings from(ObjectNode config) {
-        KestrelSettings settings = new KestrelSettings();
         config.warnIfAdditionalProperties(List.of(SERVICE));
-
-        settings.setService(config.expectStringMember(SERVICE).expectShapeId());
-
-        return settings;
+        return new KestrelSettings(config.expectStringMember(SERVICE).expectShapeId());
     }
 
     public ShapeId getService() {
         return Objects.requireNonNull(service, SERVICE + " not set");
     }
 
-    public void setService(ShapeId service) {
-        this.service = Objects.requireNonNull(service);
-    }
 }
