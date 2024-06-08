@@ -239,7 +239,7 @@ public class KestrelSymbolVisitor implements SymbolProvider, ShapeVisitor<Symbol
             .build();
     }
 
-    protected String getDefaultShapeName(Shape shape) {
+    private String getDefaultShapeName(Shape shape) {
         // Use the service-aliased name
         return "Kestrel" + StringUtils.capitalize(shape.getId().getName(service));
     }
@@ -256,7 +256,7 @@ public class KestrelSymbolVisitor implements SymbolProvider, ShapeVisitor<Symbol
     }
 
     protected Symbol.Builder structureSymbolBuilder(StructureShape shape) {
-        return createSymbolBuilder(shape, getDefaultShapeName(shape), shape.getId().getNamespace());
+        return createSymbolBuilder(shape, getDefaultShapeName(shape), shape.getId().getNamespace() + ".kestrel");
     }
 
     @Override
@@ -271,7 +271,7 @@ public class KestrelSymbolVisitor implements SymbolProvider, ShapeVisitor<Symbol
     }
 
     protected Symbol.Builder unionSymbolBuilder(UnionShape shape) {
-        return createSymbolBuilder(shape, getDefaultShapeName(shape), shape.getId().getNamespace());
+        return createSymbolBuilder(shape, getDefaultShapeName(shape), shape.getId().getNamespace() + ".kestrel");
     }
 
     @Override

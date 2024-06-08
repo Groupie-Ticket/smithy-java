@@ -11,5 +11,10 @@ extra["moduleName"] = "software.amazon.smithy.java.codegen"
 
 dependencies {
     implementation(libs.smithy.codegen)
+    implementation(project(":codegen:core"))
+    testImplementation(libs.smithy.aws.traits)
+    testImplementation(libs.smithy.protocol.traits)
     implementation(project(":codegen:kestrel"))
+    implementation(project(":kestrel-codec"))
+    testImplementation(project(":codegen:server"))
 }
