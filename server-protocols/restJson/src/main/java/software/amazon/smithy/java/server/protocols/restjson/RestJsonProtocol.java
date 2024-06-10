@@ -80,7 +80,7 @@ final class RestJsonProtocol extends ServerProtocol {
         if (value instanceof ByteValue bv) {
             return DataStream.ofBytes(bv.get());
         } else if (value instanceof ReactiveByteValue rbv) {
-            return DataStream.ofInputStream(new ReactiveInputStreamAdapter(rbv.get()));
+            return DataStream.ofPublisher(rbv.get(), null, -1);
         } else {
             throw new IllegalStateException("Unexpected type: " + value.getClass());
         }
