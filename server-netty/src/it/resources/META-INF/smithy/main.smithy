@@ -10,7 +10,7 @@ use aws.protocols#restJson1
 @restJson1
 service TestService {
     version: "today"
-    operations: [GetBeer, Echo, HashFile, ZipFile]
+    operations: [GetBeer, Echo, HashFile, ZipFile, FizzBuzz]
 }
 
 @http(method: "POST", uri: "/get-beer")
@@ -63,6 +63,23 @@ operation ZipFile {
         @required
         payload: FileStream
     }
+}
+
+@http(method: "POST", uri: "/fizzBuzz")
+operation FizzBuzz {
+    input:= {
+        @httpPayload
+        stream: ValueStream
+    }
+}
+
+@streaming
+union ValueStream {
+    Value: Value
+}
+
+structure Value {
+    value: Long
 }
 
 @streaming

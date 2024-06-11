@@ -12,7 +12,6 @@ import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.Flow;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 public class RequestBodyPublisher implements Flow.Publisher<ByteBuffer> {
@@ -21,7 +20,7 @@ public class RequestBodyPublisher implements Flow.Publisher<ByteBuffer> {
     private Supplier<Instant> clock = Instant::now;
     private long pendingReads = 0;
     private Instant swallowStart;
-    private final AtomicReference<Flow.Subscriber<? super ByteBuffer>> subscriber = new AtomicReference<>();
+    private Flow.Subscriber<? super ByteBuffer> subscriber;
     private boolean closed;
     private boolean readRequested = false;
     private Throwable closedException;
@@ -32,81 +31,83 @@ public class RequestBodyPublisher implements Flow.Publisher<ByteBuffer> {
 
     @Override
     public void subscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
-        if (!this.subscriber.compareAndSet(null, subscriber)) {
-            throw new IllegalArgumentException("Can only subscribe once");
-        }
+        channel.eventLoop().submit(() -> {
+            if (this.subscriber != null) {
+                throw new IllegalArgumentException("Can only subscribe once");
+            }
+            this.subscriber = subscriber;
 
-        channel.eventLoop().submit(() -> subscriber.onSubscribe(new Flow.Subscription() {
-            private boolean firstRequest = true;
+            subscriber.onSubscribe(new Flow.Subscription() {
+                private boolean firstRequest = true;
 
-            @Override
-            public void request(long n) {
-                if (n <= 0) {
-                    error(new IllegalArgumentException("Requested " + n + " items."));
-                    return;
-                }
+                @Override
+                public void request(long n) {
+                    if (n <= 0) {
+                        error(new IllegalArgumentException("Requested " + n + " items."));
+                        return;
+                    }
 
-                if (firstRequest) {
-                    firstRequest = false;
-                    if (closedException != null) {
-                        // there is no need to wrap an IOException or SocketException
-                        // the layer that catches this exception generally expects those types
-                        if (closedException instanceof IOException) {
-                            subscriber.onError(closedException);
-                        } else {
-                            subscriber.onError(
-                                new IOException(
-                                    "The request body has already " +
-                                        "terminated erroneously",
-                                    closedException
-                                )
-                            );
+                    if (firstRequest) {
+                        firstRequest = false;
+                        if (closedException != null) {
+                            // there is no need to wrap an IOException or SocketException
+                            // the layer that catches this exception generally expects those types
+                            if (closedException instanceof IOException) {
+                                subscriber.onError(closedException);
+                            } else {
+                                subscriber.onError(
+                                    new IOException(
+                                        "The request body has already " +
+                                            "terminated erroneously",
+                                        closedException
+                                    )
+                                );
+                            }
+                            return;
+                        } else if (closed) {
+                            subscriber.onError(new IOException("The request body has already finished streaming"));
+                            return;
                         }
+                    }
+
+                    if (closed) {
                         return;
-                    } else if (closed) {
-                        subscriber.onError(new IOException("The request body has already finished streaming"));
-                        return;
+                    }
+
+                    // We increment the number of pending reads while avoiding overflow, which could result in
+                    // deadlock.
+                    try {
+                        pendingReads = Math.addExact(pendingReads, n);
+                    } catch (ArithmeticException ignore) {
+                        pendingReads = Long.MAX_VALUE;
+                    }
+
+                    if (!readRequested) {
+                        readRequested = true;
+                        pendingReads--;
+                        channel.eventLoop().submit(channel::read);
                     }
                 }
 
-                if (closed) {
-                    return;
+                @Override
+                public void cancel() {
+
                 }
-
-                // We increment the number of pending reads while avoiding overflow, which could result in
-                // deadlock.
-                try {
-                    pendingReads = Math.addExact(pendingReads, n);
-                } catch (ArithmeticException ignore) {
-                    pendingReads = Long.MAX_VALUE;
-                }
-
-                if (!readRequested) {
-                    readRequested = true;
-                    pendingReads--;
-                    channel.eventLoop().submit(channel::read);
-                }
-            }
-
-            @Override
-            public void cancel() {
-
-            }
-        }));
+            });
+        });
     }
 
     void next(ByteBuf buf) {
         if (!channel.eventLoop().inEventLoop()) {
             throw new IllegalStateException("next() should only come from the event loop");
         }
-        var sub = subscriber.get();
         readRequested = false;
-        if (sub == null) {
+        if (subscriber == null) {
             //TODO: log
             buf.release();
             return;
         }
-        sub.onNext(buf.copy().nioBuffer());
+        subscriber.onNext(buf.copy().nioBuffer());
         buf.release();
         if (swallowStart != null && clock.get().isAfter(swallowStart.plus(maxSwallow))) {
             pendingReads = 0;
@@ -115,7 +116,6 @@ public class RequestBodyPublisher implements Flow.Publisher<ByteBuffer> {
             readRequested = true;
             pendingReads--;
             channel.read();
-            channel.eventLoop().submit(channel::read);
         } else {
             //TODO: log
         }
@@ -127,23 +127,23 @@ public class RequestBodyPublisher implements Flow.Publisher<ByteBuffer> {
         }
 
         closed = true;
-        var sub = subscriber.getAndSet(null);
-        if (sub == null) {
+        if (subscriber == null) {
             //TODO: log
             buf.release();
         } else {
-            sub.onNext(buf.copy().nioBuffer());
+            subscriber.onNext(buf.copy().nioBuffer());
             buf.release();
-            sub.onComplete();
+            subscriber.onComplete();
+            subscriber = null;
         }
     }
 
     private void error(Throwable throwable) {
         closed = true;
         closedException = throwable;
-        var sub = subscriber.getAndSet(null);
-        if (sub != null) {
-            sub.onError(throwable);
+        if (subscriber != null) {
+            subscriber.onError(throwable);
+            subscriber = null;
         } else {
             // TODO: log
         }

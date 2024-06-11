@@ -12,18 +12,23 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Flow;
 import java.util.zip.GZIPOutputStream;
 import org.junit.jupiter.api.Test;
 import smithy.java.codegen.server.test.model.Beer;
 import smithy.java.codegen.server.test.model.EchoInput;
 import smithy.java.codegen.server.test.model.EchoOutput;
+import smithy.java.codegen.server.test.model.FizzBuzzInput;
+import smithy.java.codegen.server.test.model.FizzBuzzOutput;
 import smithy.java.codegen.server.test.model.GetBeerInput;
 import smithy.java.codegen.server.test.model.GetBeerOutput;
 import smithy.java.codegen.server.test.model.HashFileInput;
 import smithy.java.codegen.server.test.model.HashFileOutput;
+import smithy.java.codegen.server.test.model.ValueStream;
 import smithy.java.codegen.server.test.model.ZipFileInput;
 import smithy.java.codegen.server.test.model.ZipFileOutput;
 import smithy.java.codegen.server.test.service.EchoOperation;
+import smithy.java.codegen.server.test.service.FizzBuzzOperation;
 import smithy.java.codegen.server.test.service.GetBeerOperation;
 import smithy.java.codegen.server.test.service.HashFileOperation;
 import smithy.java.codegen.server.test.service.TestService;
@@ -96,6 +101,40 @@ class NettyServerTest {
         }
     }
 
+    private static final class FizzBuzz implements FizzBuzzOperation {
+
+        @Override
+        public FizzBuzzOutput fizzBuzz(FizzBuzzInput input, RequestContext context) {
+            input.stream().subscribe(new Flow.Subscriber<>() {
+                private volatile Flow.Subscription subscription;
+
+                @Override
+                public void onSubscribe(Flow.Subscription subscription) {
+                    this.subscription = subscription;
+                    subscription.request(1);
+                }
+
+                @Override
+                public void onNext(ValueStream item) {
+                    System.err.println("Received: " + item.Value().value());
+                    subscription.request(1);
+                }
+
+                @Override
+                public void onError(Throwable throwable) {
+                    throwable.printStackTrace();
+                    subscription.cancel();
+                }
+
+                @Override
+                public void onComplete() {
+                    System.err.println("Complete!");
+                }
+            });
+            return FizzBuzzOutput.builder().build();
+        }
+    }
+
 
     @Test
     void testServer() throws InterruptedException {
@@ -103,6 +142,7 @@ class NettyServerTest {
             .addService(
                 TestService.builder()
                     .addEchoOperation(new EchoOperationImpl())
+                    .addFizzBuzzOperation(new FizzBuzz())
                     .addGetBeerOperation(new GetBeer())
                     .addHashFileOperation(new HashFile())
                     .addZipFileOperation(new ZipFile())
