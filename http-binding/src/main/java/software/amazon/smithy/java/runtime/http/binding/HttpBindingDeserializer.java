@@ -15,6 +15,8 @@ import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
+import software.amazon.smithy.java.runtime.core.serde.EventStreamDecodingProcessor;
+import software.amazon.smithy.java.runtime.core.serde.EventStreamFramingProcessor;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeDeserializer;
@@ -40,6 +42,7 @@ public final class HttpBindingDeserializer extends SpecificShapeDeserializer imp
     private final BindingMatcher bindingMatcher;
     private final DataStream body;
     private final ShapeBuilder<?> shapeBuilder;
+    private final AwsFlowShapeDecoder<?> eventDecoder;
     private CompletableFuture<Void> bodyDeserializationCf;
 
     private HttpBindingDeserializer(Builder builder) {
@@ -47,6 +50,7 @@ public final class HttpBindingDeserializer extends SpecificShapeDeserializer imp
         this.payloadCodec = Objects.requireNonNull(builder.payloadCodec, "payloadSerializer not set");
         this.headers = Objects.requireNonNull(builder.headers, "headers not set");
         this.bindingMatcher = builder.isRequest ? BindingMatcher.requestMatcher() : BindingMatcher.responseMatcher();
+        this.eventDecoder = builder.eventDecoder;
         this.body = builder.body == null ? DataStream.ofEmpty() : builder.body;
         this.requestPath = builder.requestPath;
         this.requestRawQueryString = builder.requestRawQueryString;
@@ -97,8 +101,12 @@ public final class HttpBindingDeserializer extends SpecificShapeDeserializer imp
                         // Set the payload on shape builder directly. This will fail for misconfigured shapes.
                         shapeBuilder.setDataStream(body);
                     } else {
-                        // TODO: shapeBuilder.setEventStream(EventStream.of(body));
-                        throw new UnsupportedOperationException("Not yet supported");
+                        EventStreamFramingProcessor<AwsFlowFrame> framer = new EventStreamFramingProcessor<>(
+                            body,
+                            new AwsFlowFrameDecoder()
+                        );
+                        framer.start();
+                        shapeBuilder.setEventStream(new EventStreamDecodingProcessor<>(framer, eventDecoder));
                     }
                 }
             }
@@ -168,6 +176,7 @@ public final class HttpBindingDeserializer extends SpecificShapeDeserializer imp
         private String requestPath;
         private int responseStatus;
         private ShapeBuilder<?> shapeBuilder;
+        private AwsFlowShapeDecoder<?> eventDecoder;
 
         private Builder() {
         }
@@ -288,6 +297,17 @@ public final class HttpBindingDeserializer extends SpecificShapeDeserializer imp
          */
         public Builder shapeBuilder(ShapeBuilder<?> shapeBuilder) {
             this.shapeBuilder = shapeBuilder;
+            return this;
+        }
+
+        /**
+         * Set the event decoder for the given shape.
+         *
+         * @param eventDecoder an event decoder.
+         * @return the builder.
+         */
+        public Builder eventDecoder(AwsFlowShapeDecoder<?> eventDecoder) {
+            this.eventDecoder = eventDecoder;
             return this;
         }
     }

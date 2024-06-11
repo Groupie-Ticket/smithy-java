@@ -14,6 +14,7 @@ import java.util.Base64;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.Flow;
 import java.util.function.Consumer;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.ShapeDirective;
@@ -673,6 +674,14 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
                             ${memberName:L}(stream);
                         }
                         """, DataStream.class);
+                }
+                if (CodegenUtils.isEventStream(model.expectShape(member.getTarget()))) {
+                    writer.write("""
+                        @Override
+                        public void setEventStream($1T<?> stream) {
+                            ${memberName:L}((${memberSymbol:T}) stream);
+                        }
+                        """, Flow.Publisher.class);
                 }
                 writer.write(
                     """
