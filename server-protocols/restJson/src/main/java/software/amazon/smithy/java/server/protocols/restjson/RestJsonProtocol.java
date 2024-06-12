@@ -10,11 +10,16 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.InputEventStreamingSdkOperation;
+import software.amazon.smithy.java.runtime.core.schema.OutputEventStreamingSdkOperation;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
+import software.amazon.smithy.java.runtime.core.serde.EventStreamFrameEncodingProcessor;
+import software.amazon.smithy.java.runtime.http.binding.AwsFlowFrame;
+import software.amazon.smithy.java.runtime.http.binding.AwsFlowFrameEncoder;
 import software.amazon.smithy.java.runtime.http.binding.AwsFlowShapeDecoder;
+import software.amazon.smithy.java.runtime.http.binding.AwsFlowShapeEncoder;
 import software.amazon.smithy.java.runtime.http.binding.BindingMatcher;
 import software.amazon.smithy.java.runtime.http.binding.HttpBindingDeserializer;
 import software.amazon.smithy.java.runtime.http.binding.HttpBindingSerializer;
@@ -112,7 +117,17 @@ final class RestJsonProtocol extends ServerProtocol {
         serializer.flush();
         job.reply().context().put(HttpAttributes.HTTP_HEADERS, serializer.getHeaders());
 
-        if (sdkOperation.streamingOutput()) {
+        if (sdkOperation instanceof OutputEventStreamingSdkOperation<?, ?, ?> outputStreamingOp) {
+            EventStreamFrameEncodingProcessor<AwsFlowFrame, ?> stream = new EventStreamFrameEncodingProcessor<>(
+                serializer.getEventStream(),
+                new AwsFlowShapeEncoder<>(
+                    outputStreamingOp.outputEventSchema(),
+                    codec
+                ),
+                new AwsFlowFrameEncoder()
+            );
+            job.reply().setValue(new ReactiveByteValue(stream));
+        } else if (sdkOperation.streamingOutput()) {
             job.reply().setValue(new ReactiveByteValue(serializer.getBody()));
         } else {
             DataStream dataStream = serializer.getBody();

@@ -12,6 +12,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.StringJoiner;
+import java.util.concurrent.Flow;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
@@ -53,6 +54,7 @@ public final class HttpBindingSerializer extends SpecificShapeSerializer impleme
     private ShapeSerializer shapeBodySerializer;
     private ByteArrayOutputStream shapeBodyOutput;
     private DataStream httpPayload;
+    private Flow.Publisher<? extends SerializableStruct> eventStream;
     private int responseStatus;
 
     private final BindingMatcher bindingMatcher;
@@ -105,6 +107,11 @@ public final class HttpBindingSerializer extends SpecificShapeSerializer impleme
         } else {
             struct.serializeMembers(new BindingSerializer(this, null));
         }
+    }
+
+    @Override
+    public void writeEventStream(Schema schema, Flow.Publisher<? extends SerializableStruct> value) {
+        eventStream = value;
     }
 
     @Override
@@ -194,6 +201,15 @@ public final class HttpBindingSerializer extends SpecificShapeSerializer impleme
         return responseStatus;
     }
 
+    public Flow.Publisher<? extends SerializableStruct> getEventStream() {
+        return eventStream;
+    }
+
+    void setEventStream(Flow.Publisher<? extends SerializableStruct> stream) {
+        headers.put("Content-Type", List.of("application/vnd.amazon.eventstream"));
+        this.eventStream = stream;
+    }
+
     private static final class BindingSerializer extends InterceptingSerializer {
         private final HttpBindingSerializer serializer;
         private final ShapeSerializer bodyStructSerializer;
@@ -226,8 +242,25 @@ public final class HttpBindingSerializer extends SpecificShapeSerializer impleme
                         structureSerializer = serializer.payloadCodec.createSerializer(structureBytes);
                         yield structureSerializer;
                     } else {
-                        // httpPayload serialization is handled elsewhere.
-                        yield ShapeSerializer.nullSerializer();
+                        yield new SpecificShapeSerializer() {
+                            @Override
+                            public void writeDataStream(Schema schema, DataStream value) {
+                                serializer.setHttpPayload(schema, value);
+                            }
+
+                            @Override
+                            public void writeEventStream(
+                                Schema schema,
+                                Flow.Publisher<? extends SerializableStruct> value
+                            ) {
+                                serializer.setEventStream(value);
+                            }
+
+                            @Override
+                            public void writeBlob(Schema schema, byte[] value) {
+                                serializer.setHttpPayload(schema, DataStream.ofBytes(value));
+                            }
+                        };
                     }
                 }
             };

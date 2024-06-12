@@ -15,6 +15,7 @@ import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.InputEventStreamingSdkOperation;
+import software.amazon.smithy.java.runtime.core.schema.OutputEventStreamingSdkOperation;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.schema.TypeRegistry;
@@ -102,6 +103,17 @@ public class OperationGenerator
                     )
                 );
 
+                writer.putContext(
+                    "outputEventStreamSection",
+                    new OutputEventStreamGenerator(
+                        writer,
+                        shape,
+                        directive.symbolProvider(),
+                        directive.model(),
+                        directive.service()
+                    )
+                );
+
                 writer.write(
                     """
                         public final class ${shape:T} implements ${operationType:C} {
@@ -136,6 +148,8 @@ public class OperationGenerator
                             }
 
                             ${inputEventStreamSection:C|}
+
+                            ${outputEventStreamSection:C|}
 
                             @Override
                             public ${sdkSchema:T} outputSchema() {
@@ -197,7 +211,11 @@ public class OperationGenerator
             var input = symbolProvider.toSymbol(inputShape);
             var outputShape = model.expectShape(shape.getOutputShape());
             var output = symbolProvider.toSymbol(outputShape);
-            EventStreamIndex.of(model).getInputInfo(shape).ifPresentOrElse(info -> {
+
+            var index = EventStreamIndex.of(model);
+            var inputInfo = index.getInputInfo(shape);
+            var outputInfo = index.getOutputInfo(shape);
+            inputInfo.ifPresent(info -> {
                 writer.writeInline(
                     "$1T<$2T, $3T, $4T>",
                     InputEventStreamingSdkOperation.class,
@@ -205,9 +223,23 @@ public class OperationGenerator
                     output,
                     symbolProvider.toSymbol(info.getEventStreamTarget())
                 );
-            }, () -> {
-                writer.writeInline("$1T<$2T, $3T>", ApiOperation.class, input, output);
             });
+            outputInfo.ifPresent(info -> {
+                if (inputInfo.isPresent()) {
+                    writer.writeInline(", ");
+                }
+                writer.writeInline(
+                    "$1T<$2T, $3T, $4T>",
+                    OutputEventStreamingSdkOperation.class,
+                    input,
+                    output,
+                    symbolProvider.toSymbol(info.getEventStreamTarget())
+                );
+            });
+
+            if (inputInfo.isEmpty() && outputInfo.isEmpty()) {
+                writer.writeInline("$1T<$2T, $3T>", ApiOperation.class, input, output);
+            }
         }
     }
 
@@ -226,6 +258,28 @@ public class OperationGenerator
 
                     @Override
                     public $3T inputEventSchema() {
+                        return $2T.SCHEMA;
+                    }
+                    """, ShapeBuilder.class, symbolProvider.toSymbol(info.getEventStreamTarget()), Schema.class);
+            });
+        }
+    }
+
+    private record OutputEventStreamGenerator(
+        JavaWriter writer, OperationShape shape, SymbolProvider symbolProvider,
+        Model model, ServiceShape service
+    ) implements Runnable {
+        @Override
+        public void run() {
+            EventStreamIndex.of(model).getOutputInfo(shape).ifPresent(info -> {
+                writer.write("""
+                    @Override
+                    public $1T<$2T> outputEventBuilder() {
+                        return $2T.builder();
+                    }
+
+                    @Override
+                    public $3T outputEventSchema() {
                         return $2T.SCHEMA;
                     }
                     """, ShapeBuilder.class, symbolProvider.toSymbol(info.getEventStreamTarget()), Schema.class);

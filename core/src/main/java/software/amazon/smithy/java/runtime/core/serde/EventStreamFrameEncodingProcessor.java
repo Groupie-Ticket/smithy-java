@@ -12,82 +12,57 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 
-public final class EventStreamFramingProcessor<F extends Frame<?>> implements Flow.Processor<ByteBuffer, F>,
+public final class EventStreamFrameEncodingProcessor<F extends Frame<?>, T extends SerializableStruct> implements
+    Flow.Processor<T, ByteBuffer>,
     Flow.Subscription {
     private static final NoInitialEventException COMPLETE = new NoInitialEventException();
 
     private final AtomicReference<Throwable> terminalEvent = new AtomicReference<>();
     private final AtomicLong pendingRequests = new AtomicLong();
     private final AtomicInteger pendingFlushes = new AtomicInteger();
-    private final Flow.Publisher<ByteBuffer> publisher;
-    private final FrameDecoder<F> decoder;
-    private final BlockingQueue<F> queue = new LinkedBlockingQueue<>();
+    private final Flow.Publisher<T> publisher;
+    private final EventEncoder<T, F> eventEncoder;
+    private final FrameEncoder<F> encoder;
+    private final BlockingQueue<ByteBuffer> queue = new LinkedBlockingQueue<>();
 
-    private volatile ByteBuffer leftover;
     private volatile Flow.Subscription upstreamSubscription;
-    private volatile Flow.Subscriber<? super F> downstream;
+    private volatile Flow.Subscriber<? super ByteBuffer> downstream;
     private boolean terminated = false;
 
-    public EventStreamFramingProcessor(Flow.Publisher<ByteBuffer> publisher, FrameDecoder<F> decoder) {
+    public EventStreamFrameEncodingProcessor(
+        Flow.Publisher<T> publisher,
+        EventEncoder<T, F> eventEncoder,
+        FrameEncoder<F> encoder
+    ) {
         this.publisher = publisher;
-        this.decoder = decoder;
-    }
-
-    public void start() {
+        this.eventEncoder = eventEncoder;
+        this.encoder = encoder;
         publisher.subscribe(this);
     }
 
     @Override
-    public synchronized void onSubscribe(Flow.Subscription subscription) {
+    public void onSubscribe(Flow.Subscription subscription) {
         upstreamSubscription = subscription;
-        request(1); // load the initial message
     }
 
     @Override
-    public void subscribe(Flow.Subscriber<? super F> subscriber) {
+    public void subscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
         downstream = subscriber;
         subscriber.onSubscribe(this);
     }
 
     @Override
-    public void onNext(ByteBuffer item) {
-        ByteBuffer toRead;
-        if (leftover != null) {
-            toRead = concat(leftover, item);
-        } else {
-            toRead = item;
-        }
-
+    public void onNext(T item) {
         try {
-            for (F frame : decoder.decode(toRead)) {
-                queue.add(frame);
-            }
+            queue.add(encoder.encode(eventEncoder.encode(item)));
         } catch (Throwable t) {
             onError(t);
             return;
         }
 
-        if (toRead.hasRemaining()) {
-            leftover = toRead;
-        } else {
-            leftover = null;
-        }
-
         flush();
-    }
-
-    private ByteBuffer concat(ByteBuffer leftover, ByteBuffer item) {
-        if (!leftover.isReadOnly()) {
-            leftover.compact();
-            if (leftover.remaining() >= item.remaining()) {
-                return leftover.put(item).flip();
-            }
-        }
-
-        leftover.flip();
-        ByteBuffer retVal = ByteBuffer.allocate(leftover.remaining() + item.remaining());
-        return retVal.put(leftover).put(item).flip();
     }
 
     @Override
@@ -128,7 +103,7 @@ public final class EventStreamFramingProcessor<F extends Frame<?>> implements Fl
         while (loop > 0) {
             long pending = pendingRequests.get();
 
-            Flow.Subscriber<? super F> subscriber = downstream;
+            Flow.Subscriber<? super ByteBuffer> subscriber = downstream;
             long delivered = sendMessages(subscriber, pending);
             boolean empty = queue.isEmpty();
             Throwable term = terminalEvent.get();
@@ -185,7 +160,7 @@ public final class EventStreamFramingProcessor<F extends Frame<?>> implements Fl
     /**
      * @return true if this decoder is in a terminal state
      */
-    private boolean attemptTermination(Flow.Subscriber<? super F> subscriber, Throwable term, boolean done) {
+    private boolean attemptTermination(Flow.Subscriber<? super ByteBuffer> subscriber, Throwable term, boolean done) {
         if (done && subscriber != null) {
             if (term == COMPLETE) {
                 subscriber.onComplete();
@@ -205,12 +180,12 @@ public final class EventStreamFramingProcessor<F extends Frame<?>> implements Fl
      * @param outstanding outstanding message demand to fulfill
      * @return number of fulfilled requests
      */
-    private long sendMessages(Flow.Subscriber<? super F> subscriber, long outstanding) {
+    private long sendMessages(Flow.Subscriber<? super ByteBuffer> subscriber, long outstanding) {
         long served = 0;
 
         if (subscriber != null) {
             while (served < outstanding) {
-                F m = queue.poll();
+                ByteBuffer m = queue.poll();
                 if (m == null) {
                     break;
                 }
@@ -240,8 +215,6 @@ public final class EventStreamFramingProcessor<F extends Frame<?>> implements Fl
     }
 
     private static long accumulate(AtomicLong l, long n) {
-        return l.accumulateAndGet(n, EventStreamFramingProcessor::accumulate);
+        return l.accumulateAndGet(n, EventStreamFrameEncodingProcessor::accumulate);
     }
-
-
 }
