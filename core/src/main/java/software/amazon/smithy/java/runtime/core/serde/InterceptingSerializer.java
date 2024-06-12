@@ -8,6 +8,7 @@ package software.amazon.smithy.java.runtime.core.serde;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
+import java.util.concurrent.Flow;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
@@ -123,6 +124,12 @@ public abstract class InterceptingSerializer implements ShapeSerializer {
     @Override
     public void writeDataStream(Schema schema, DataStream value) {
         before(schema).writeDataStream(schema, value);
+        after(schema);
+    }
+
+    @Override
+    public void writeEventStream(Schema schema, Flow.Publisher<? extends SerializableStruct> value) {
+        before(schema).writeEventStream(schema, value);
         after(schema);
     }
 

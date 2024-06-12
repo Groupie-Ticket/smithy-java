@@ -8,6 +8,7 @@ package software.amazon.smithy.java.runtime.core.serde;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
+import java.util.concurrent.Flow;
 import java.util.function.BiConsumer;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
@@ -104,6 +105,11 @@ public abstract class SpecificShapeSerializer implements ShapeSerializer {
 
     @Override
     public void writeDataStream(Schema schema, DataStream value) {
+        throw throwForInvalidState(schema);
+    }
+
+    @Override
+    public void writeEventStream(Schema schema, Flow.Publisher<? extends SerializableStruct> value) {
         throw throwForInvalidState(schema);
     }
 

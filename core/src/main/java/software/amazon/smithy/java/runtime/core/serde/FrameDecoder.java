@@ -11,7 +11,7 @@ import java.util.List;
 /**
  * Decodes frames from bytes.
  */
-public interface FrameDecoder<F extends Frame> {
+public interface FrameDecoder<F extends Frame<?>> {
     /**
      * Decode 0 or more frames from a buffer, leaving extra data at the end of the buffer for subsequent consumption.
      * @param buffer the buffer to attempt to read frames from

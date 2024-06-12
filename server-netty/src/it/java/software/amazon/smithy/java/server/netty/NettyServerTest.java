@@ -13,13 +13,18 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Flow;
+import java.util.concurrent.SubmissionPublisher;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.GZIPOutputStream;
 import org.junit.jupiter.api.Test;
 import smithy.java.codegen.server.test.model.Beer;
+import smithy.java.codegen.server.test.model.BuzzEvent;
 import smithy.java.codegen.server.test.model.EchoInput;
 import smithy.java.codegen.server.test.model.EchoOutput;
 import smithy.java.codegen.server.test.model.FizzBuzzInput;
 import smithy.java.codegen.server.test.model.FizzBuzzOutput;
+import smithy.java.codegen.server.test.model.FizzBuzzStream;
+import smithy.java.codegen.server.test.model.FizzEvent;
 import smithy.java.codegen.server.test.model.GetBeerInput;
 import smithy.java.codegen.server.test.model.GetBeerOutput;
 import smithy.java.codegen.server.test.model.HashFileInput;
@@ -105,33 +110,44 @@ class NettyServerTest {
 
         @Override
         public FizzBuzzOutput fizzBuzz(FizzBuzzInput input, RequestContext context) {
-            input.stream().subscribe(new Flow.Subscriber<>() {
-                private volatile Flow.Subscription subscription;
+            FizzBuzzProcessor processor = new FizzBuzzProcessor();
+            input.stream().subscribe(processor);
+            return FizzBuzzOutput.builder().stream(processor).build();
+        }
 
-                @Override
-                public void onSubscribe(Flow.Subscription subscription) {
-                    this.subscription = subscription;
-                    subscription.request(1);
-                }
+        private static final class FizzBuzzProcessor extends SubmissionPublisher<FizzBuzzStream> implements
+            Flow.Subscriber<ValueStream> {
+            private final AtomicReference<Flow.Subscription> upstream = new AtomicReference<>();
 
-                @Override
-                public void onNext(ValueStream item) {
-                    System.err.println("Received: " + item.Value().value());
-                    subscription.request(1);
+            @Override
+            public void onSubscribe(Flow.Subscription subscription) {
+                if (!upstream.compareAndSet(null, subscription)) {
+                    throw new IllegalStateException();
                 }
+                subscription.request(1);
+            }
 
-                @Override
-                public void onError(Throwable throwable) {
-                    throwable.printStackTrace();
-                    subscription.cancel();
+            @Override
+            public void onNext(ValueStream item) {
+                long value = item.Value().value();
+                if (value % 3 == 0) {
+                    submit(FizzBuzzStream.builder().fizz(FizzEvent.builder().value(value).build()).build());
                 }
+                if (value % 5 == 0) {
+                    submit(FizzBuzzStream.builder().buzz(BuzzEvent.builder().value(value).build()).build());
+                }
+                upstream.get().request(1);
+            }
 
-                @Override
-                public void onComplete() {
-                    System.err.println("Complete!");
-                }
-            });
-            return FizzBuzzOutput.builder().build();
+            @Override
+            public void onError(Throwable throwable) {
+                closeExceptionally(throwable);
+            }
+
+            @Override
+            public void onComplete() {
+                super.close();
+            }
         }
     }
 

@@ -17,18 +17,19 @@ public class AwsFlowFrameDecoder implements FrameDecoder<AwsFlowFrame> {
         List<AwsFlowFrame> frames = new ArrayList<>();
         while (buffer.remaining() > AwsFlowFramePrelude.LENGTH_WITH_CRC) {
             var prelude = AwsFlowFramePrelude.decode(buffer);
-            if (AwsFlowFramePrelude.LENGTH_WITH_CRC + prelude.getTotalLength() >= buffer.remaining()) {
-                Message decoded = Message.decode(buffer);
-                // TODO: hack: sigv4 encoded messages are double-wrapped, this just unwraps them blindly for now
-                if (decoded.getHeaders().containsKey(":chunk-signature")) {
-                    if (decoded.getPayload().length == 0) {
-                        // TODO end of sigv4 stream is an empty chunk?
-                        break;
-                    }
-                    decoded = Message.decode(ByteBuffer.wrap(decoded.getPayload()));
-                }
-                frames.add(new AwsFlowFrame(decoded));
+            if (buffer.remaining() < prelude.getTotalLength()) {
+                break;
             }
+            Message decoded = Message.decode(buffer);
+            // TODO: hack: sigv4 encoded messages are double-wrapped, this just unwraps them blindly for now
+            if (decoded.getHeaders().containsKey(":chunk-signature")) {
+                if (decoded.getPayload().length == 0) {
+                    // TODO end of sigv4 stream is an empty chunk?
+                    break;
+                }
+                decoded = Message.decode(ByteBuffer.wrap(decoded.getPayload()));
+            }
+            frames.add(new AwsFlowFrame(decoded));
         }
         return frames;
     }

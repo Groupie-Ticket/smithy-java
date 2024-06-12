@@ -15,8 +15,7 @@ import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
-import software.amazon.smithy.java.runtime.core.serde.EventStreamDecodingProcessor;
-import software.amazon.smithy.java.runtime.core.serde.EventStreamFramingProcessor;
+import software.amazon.smithy.java.runtime.core.serde.EventStreamFrameDecodingProcessor;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeDeserializer;
@@ -101,12 +100,12 @@ public final class HttpBindingDeserializer extends SpecificShapeDeserializer imp
                         // Set the payload on shape builder directly. This will fail for misconfigured shapes.
                         shapeBuilder.setDataStream(body);
                     } else {
-                        EventStreamFramingProcessor<AwsFlowFrame> framer = new EventStreamFramingProcessor<>(
+                        EventStreamFrameDecodingProcessor<AwsFlowFrame, ?> stream = new EventStreamFrameDecodingProcessor<>(
                             body,
-                            new AwsFlowFrameDecoder()
+                            new AwsFlowFrameDecoder(),
+                            eventDecoder
                         );
-                        framer.start();
-                        shapeBuilder.setEventStream(new EventStreamDecodingProcessor<>(framer, eventDecoder));
+                        shapeBuilder.setEventStream(stream);
                     }
                 }
             }

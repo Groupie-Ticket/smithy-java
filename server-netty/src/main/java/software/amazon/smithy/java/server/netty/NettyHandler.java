@@ -16,6 +16,7 @@ import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders.Names;
 import io.netty.handler.codec.http.HttpMessage;
 import io.netty.handler.codec.http.HttpRequest;
@@ -169,8 +170,15 @@ final class NettyHandler extends ChannelDuplexHandler {
 
     //TODO Fix this after we decide on a header implementation
     private static void setHeaders(Reply reply, HttpResponse response) {
+        boolean hasContentLength = false;
+        boolean hasTransferEncoding = false;
         for (var entry : reply.context().get(HttpAttributes.HTTP_HEADERS).map().entrySet()) {
             response.headers().add(entry.getKey(), entry.getValue());
+            hasContentLength |= entry.getKey().equalsIgnoreCase(HttpHeaderNames.CONTENT_LENGTH.toString());
+            hasTransferEncoding |= entry.getKey().equalsIgnoreCase(HttpHeaderNames.TRANSFER_ENCODING.toString());
+        }
+        if (reply.getValue() instanceof ReactiveByteValue && !hasContentLength) {
+            response.headers().add(HttpHeaderNames.TRANSFER_ENCODING, "chunked");
         }
     }
 

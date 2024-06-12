@@ -71,6 +71,10 @@ operation FizzBuzz {
         @httpPayload
         stream: ValueStream
     }
+    output:= {
+        @httpPayload
+        stream: FizzBuzzStream
+    }
 }
 
 @streaming
@@ -79,6 +83,20 @@ union ValueStream {
 }
 
 structure Value {
+    value: Long
+}
+
+@streaming
+union FizzBuzzStream {
+    fizz: FizzEvent
+    buzz: BuzzEvent
+}
+
+structure FizzEvent {
+    value: Long
+}
+
+structure BuzzEvent {
     value: Long
 }
 
