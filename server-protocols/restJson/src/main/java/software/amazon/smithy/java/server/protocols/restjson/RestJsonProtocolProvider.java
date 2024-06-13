@@ -20,4 +20,9 @@ public class RestJsonProtocolProvider implements ServerProtocolProvider<RestJson
     public ShapeId getProtocolId() {
         return ShapeId.from("aws.protocols#restJson1");
     }
+
+    @Override
+    public int priority() {
+        return 2;
+    }
 }

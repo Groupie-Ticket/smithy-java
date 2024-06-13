@@ -5,9 +5,14 @@ namespace smithy.java.codegen.server.test
 
 use aws.auth#sigv4
 use aws.protocols#restJson1
+use smithy.protocols#idx
+use smithy.protocols#indexed
+use smithy.protocols#rpcv2Kestrel
 
 @sigv4(name: "restjson")
 @restJson1
+@rpcv2Kestrel
+@indexed
 service TestService {
     version: "today"
     operations: [GetBeer, Echo, HashFile, ZipFile, FizzBuzz]
@@ -18,15 +23,18 @@ operation GetBeer {
     input:= {
         @httpHeader("X-Beer-Input-Id")
         @required
+        @idx(1)
         id: Long
     }
     output:= {
         @required
         @httpPayload
+        @idx(1)
         value: Beer
 
         @required
         @httpHeader("X-Beer-Output-Id")
+        @idx(2)
         beerId: Long
     }
 }
@@ -42,10 +50,12 @@ operation HashFile {
     input:= {
         @httpPayload
         @required
+        @idx(1)
         payload: FileStream
     }
 
     output:= {
+        @idx(1)
         hashcode: String
     }
 }
@@ -55,12 +65,14 @@ operation ZipFile {
     input:= {
         @httpPayload
         @required
+        @idx(1)
         payload: FileStream
     }
 
     output:= {
         @httpPayload
         @required
+        @idx(1)
         payload: FileStream
     }
 }
@@ -69,34 +81,42 @@ operation ZipFile {
 operation FizzBuzz {
     input:= {
         @httpPayload
+        @idx(1)
         stream: ValueStream
     }
     output:= {
         @httpPayload
+        @idx(1)
         stream: FizzBuzzStream
     }
 }
 
 @streaming
 union ValueStream {
+    @idx(1)
     Value: Value
 }
 
 structure Value {
+    @idx(1)
     value: Long
 }
 
 @streaming
 union FizzBuzzStream {
+    @idx(1)
     fizz: FizzEvent
+    @idx(2)
     buzz: BuzzEvent
 }
 
 structure FizzEvent {
+    @idx(1)
     value: Long
 }
 
 structure BuzzEvent {
+    @idx(1)
     value: Long
 }
 
@@ -104,21 +124,27 @@ structure BuzzEvent {
 blob FileStream
 
 structure EchoInput {
+    @idx(1)
     value: EchoPayload
 }
 
 structure EchoOutput {
+    @idx(1)
     value: EchoPayload
 }
 
 structure EchoPayload {
+    @idx(1)
     string: String
+
     @required
     @default(0)
+    @idx(2)
     echoCount: Integer
 }
 
 structure Beer {
+    @idx(1)
     name: String
 }
 

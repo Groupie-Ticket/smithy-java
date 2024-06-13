@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.server.core;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
@@ -31,6 +32,7 @@ public final class ProtocolResolver {
     public ProtocolResolver(Service service) {
         serverProtocolHandlers = SERVER_PROTOCOL_HANDLERS.values()
             .stream()
+            .sorted(Comparator.comparing(ServerProtocolProvider::priority))
             .map(p -> p.provideProtocolHandler(service))
             .toList();
     }

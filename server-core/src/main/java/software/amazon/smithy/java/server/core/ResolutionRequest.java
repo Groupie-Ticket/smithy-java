@@ -11,10 +11,13 @@ import java.net.http.HttpHeaders;
 public final class ResolutionRequest {
     private final HttpHeaders headers;
     private final URI uri;
+    private final String verb;
+
 
     private ResolutionRequest(Builder builder) {
         this.headers = builder.headers;
         this.uri = builder.uri;
+        this.verb = builder.httpMethod;
     }
 
     public static Builder builder() {
@@ -29,7 +32,12 @@ public final class ResolutionRequest {
         return uri;
     }
 
+    public String getHttpMethod() {
+        return verb;
+    }
+
     public static final class Builder {
+        public String httpMethod;
         private HttpHeaders headers;
         private URI uri;
 
@@ -43,6 +51,11 @@ public final class ResolutionRequest {
 
         public Builder uri(URI uri) {
             this.uri = uri;
+            return this;
+        }
+
+        public Builder verb(String verb) {
+            this.httpMethod = verb;
             return this;
         }
 

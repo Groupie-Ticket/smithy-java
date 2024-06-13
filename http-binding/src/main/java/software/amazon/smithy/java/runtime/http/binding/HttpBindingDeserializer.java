@@ -108,6 +108,7 @@ public final class HttpBindingDeserializer extends SpecificShapeDeserializer imp
                         shapeBuilder.setEventStream(stream);
                     }
                 }
+                default -> throw new UnsupportedOperationException("not supported yet");
             }
         }
 

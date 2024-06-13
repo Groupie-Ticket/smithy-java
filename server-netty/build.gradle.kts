@@ -18,7 +18,12 @@ dependencies {
     itImplementation(project(":server-core"))
     itImplementation(project(":core"))
     itImplementation(project(":server-protocols:restJson"))
+    itImplementation(project(":server-protocols:rpcV2Kestrel"))
     testImplementation(project(":codegen::server"))
+    testImplementation(project(":codegen::kestrel-smithy-interop"))
+    testImplementation(project(":codegen::kestrel"))
+    testImplementation(project(":kestrel"))
+    testImplementation(project(":kestrel-codec"))
     implementation(libs.smithy.codegen)
 }
 
@@ -27,7 +32,8 @@ val generatedSrcDir = layout.buildDirectory.dir("generated-src").get()
 val generateSrcTask = tasks.register<JavaExec>("generateSources") {
     delete(files(generatedSrcDir))
     dependsOn("test")
-    classpath = sourceSets["test"].runtimeClasspath + sourceSets["test"].output + sourceSets["it"].resources.getSourceDirectories()
+    classpath = sourceSets["test"].runtimeClasspath + sourceSets["test"].output + sourceSets["it"].resources.sourceDirectories
+    println("Class path is ${classpath.asPath}")
     mainClass = "software.amazon.smithy.java.server.netty.TestServerJavaCodegenRunner"
     environment("service", "smithy.java.codegen.server.test#TestService")
     environment("namespace", "smithy.java.codegen.server.test")
@@ -38,6 +44,9 @@ val generateSrcTask = tasks.register<JavaExec>("generateSources") {
 sourceSets {
     it {
         java {
+            srcDir(generatedSrcDir)
+        }
+        resources {
             srcDir(generatedSrcDir)
         }
     }

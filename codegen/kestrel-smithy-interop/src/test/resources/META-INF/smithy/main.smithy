@@ -45,6 +45,8 @@ structure EchoPayload {
     @default(0)
     @idx(2)
     echoCount: Integer
+    @idx(3)
+    booleanMember: Boolean
 }
 
 structure Beer {

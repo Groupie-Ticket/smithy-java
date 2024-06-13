@@ -8,7 +8,11 @@ package software.amazon.smithy.java.server.exceptions;
 import software.amazon.smithy.java.runtime.core.schema.ApiException;
 
 public final class UnknownOperationException extends ApiException {
-    public UnknownOperationException(String s) {
-        super(s);
+    public UnknownOperationException(String unexpectedOperationName) {
+        super("Unknown operation: " + unexpectedOperationName);
+    }
+
+    public UnknownOperationException() {
+        super("Unknown operation");
     }
 }

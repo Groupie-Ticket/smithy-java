@@ -133,7 +133,14 @@ public final class DirectedKestrelCodegen implements
                 var ms = value.get(i);
                 newShapes.add(
                     ms.toBuilder()
-                        .addTrait(new KestrelFieldTrait(e.getKey(), i / 61, i % 61 + 1, !idx.isMemberNullable(ms)))
+                        .addTrait(
+                            new KestrelFieldTrait(
+                                e.getKey(),
+                                i / 61,
+                                i % 61 + 1,
+                                !idx.isMemberNullable(ms, NullableIndex.CheckMode.SERVER)
+                            )
+                        )
                         .build()
                 );
             }
