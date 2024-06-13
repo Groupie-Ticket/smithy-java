@@ -11,7 +11,7 @@ public sealed interface Reply permits ReplyImpl {
 
     Context context();
 
-    <T extends Value> T getValue();
+    <T extends Value<?>> T getValue();
 
-    <T extends Value> void setValue(T value);
+    <T extends Value<?>> void setValue(T value);
 }

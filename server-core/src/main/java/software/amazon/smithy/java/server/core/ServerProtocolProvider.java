@@ -13,4 +13,6 @@ public interface ServerProtocolProvider<T extends ServerProtocol> {
     T provideProtocolHandler(Service service);
 
     ShapeId getProtocolId();
+
+    int priority();
 }

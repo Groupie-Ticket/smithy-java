@@ -5,9 +5,14 @@
 
 package software.amazon.smithy.java.codegen.kestrel;
 
+import static software.amazon.smithy.java.codegen.kestrel.InteropSymbolProperties.SMITHY_SYMBOL;
+
+import java.io.File;
 import java.util.List;
-import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
+import software.amazon.smithy.java.codegen.kestrel.generators.ConverterMethodsGenerator;
+import software.amazon.smithy.java.codegen.kestrel.generators.KestrelCodecFactoryGenerator;
+import software.amazon.smithy.java.kestrel.codec.KestrelCodecFactory;
 import software.amazon.smithy.kestrel.codegen.*;
 import software.amazon.smithy.kestrel.codegen.CodeSections.StartClassSection;
 import software.amazon.smithy.model.Model;
@@ -31,6 +36,22 @@ public class SmithyKestrelIntegration implements KestrelIntegration {
         return List.of(new InterfaceGenerator(), new ConverterMethodsGenerator());
     }
 
+    @Override
+    public void customize(GenerationContext codegenContext) {
+        var model = codegenContext.model();
+        var service = (ServiceShape) model.expectShape(codegenContext.settings().getService());
+        var symbolProvider = codegenContext.symbolProvider();
+        var codecGenerator = new KestrelCodecFactoryGenerator(service, model, symbolProvider);
+        var delegator = codegenContext.writerDelegator();
+        var fileName = service.getId().getNamespace().replaceAll("\\.", File.separator)
+            + File.separator + "kestrel" + File.separator + codecGenerator.className() + ".java";
+        delegator.useFileWriter(fileName, service.getId().getNamespace() + ".kestrel", codecGenerator);
+        delegator.useFileWriter("META-INF/services/" + KestrelCodecFactory.class.getName(), w -> {
+            w.setPlain(true);
+            w.write(service.getId().getNamespace() + ".kestrel." + codecGenerator.className());
+        });
+    }
+
     private static final class InterfaceGenerator implements CodeInterceptor<StartClassSection, JavaWriter> {
 
         @Override
@@ -42,9 +63,11 @@ public class SmithyKestrelIntegration implements KestrelIntegration {
         public void write(JavaWriter writer, String s, StartClassSection section) {
             var generator = section.generator();
             var symbol = generator.getSymbol();
-            var smithySymbol = symbol.expectProperty("smithySymbol", Symbol.class);
+            var smithySymbol = symbol.expectProperty(SMITHY_SYMBOL);
             if (generator.getShape().hasTrait(StreamingTrait.class)) {
-                smithySymbol = CommonSymbols.Object.getSymbol();
+//                smithySymbol = CommonSymbols.Object.getSymbol();
+                writer.write("public final class $L implements $T {", symbol.getName(), CommonSymbols.KestrelObject);
+                return;
             }
             writer.write(
                 """

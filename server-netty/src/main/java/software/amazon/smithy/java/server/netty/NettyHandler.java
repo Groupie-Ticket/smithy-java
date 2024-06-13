@@ -76,6 +76,7 @@ final class NettyHandler extends ChannelDuplexHandler {
                 ResolutionRequest
                     .builder()
                     .uri(uri)
+                    .verb(httpRequest.method().name())
                     .headers(headers)
                     .build()
             );

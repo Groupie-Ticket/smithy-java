@@ -5,11 +5,21 @@
 
 package software.amazon.smithy.java.server.core;
 
+import java.util.List;
 import software.amazon.smithy.java.runtime.core.Context;
 import software.amazon.smithy.java.server.Operation;
+import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 public abstract class ServerProtocol {
+
+    private final List<Operation<?, ?>> operations;
+    private final Service service;
+
+    protected ServerProtocol(Service service) {
+        this.service = service;
+        this.operations = List.copyOf(service.getAllOperations());
+    }
 
     public static Context.Key<ServerProtocol> SERVER_PROTOCOL = Context.key("server-protocol");
 
@@ -27,6 +37,14 @@ public abstract class ServerProtocol {
     public abstract void deserializeInput(Job job);
 
     public abstract void serializeOutput(Job job);
+
+    protected List<Operation<?, ?>> getOperations() {
+        return operations;
+    }
+
+    protected Service getService() {
+        return service;
+    }
 
 
 }

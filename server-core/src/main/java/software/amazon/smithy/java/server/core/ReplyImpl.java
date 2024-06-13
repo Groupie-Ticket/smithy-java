@@ -22,12 +22,12 @@ public final class ReplyImpl implements Reply {
     }
 
     @Override
-    public <T extends Value> void setValue(T value) {
+    public <T extends Value<?>> void setValue(T value) {
         this.value = value;
     }
 
     @Override
-    public <T extends Value> T getValue() {
+    public <T extends Value<?>> T getValue() {
         return (T) value;
     }
 }

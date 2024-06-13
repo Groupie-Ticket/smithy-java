@@ -9,6 +9,7 @@ import java.nio.file.Paths;
 import software.amazon.smithy.build.FileManifest;
 import software.amazon.smithy.build.PluginContext;
 import software.amazon.smithy.java.codegen.server.JavaServerCodegenPlugin;
+import software.amazon.smithy.kestrel.codegen.KestrelCodegenPlugin;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.node.ObjectNode;
 
@@ -23,6 +24,7 @@ public final class TestServerJavaCodegenRunner {
 
     public static void main(String[] args) {
         JavaServerCodegenPlugin plugin = new JavaServerCodegenPlugin();
+        KestrelCodegenPlugin kestrelPlugin = new KestrelCodegenPlugin();
         Model model = Model.assembler(TestServerJavaCodegenRunner.class.getClassLoader())
             .discoverModels(TestServerJavaCodegenRunner.class.getClassLoader())
             .assemble()
@@ -39,5 +41,6 @@ public final class TestServerJavaCodegenRunner {
             .model(model)
             .build();
         plugin.execute(context);
+        kestrelPlugin.execute(context);
     }
 }

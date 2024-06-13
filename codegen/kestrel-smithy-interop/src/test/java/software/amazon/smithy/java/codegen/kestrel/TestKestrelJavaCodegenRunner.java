@@ -26,6 +26,7 @@ public class TestKestrelJavaCodegenRunner {
             .unwrap();
         String output = Optional.ofNullable(System.getenv("output"))
             .orElse("/Volumes/workplace/smithy-java/codegen/kestrel-smithy-interop/build/generated-src");
+
         System.out.println("WRITING TO : " + output);
         String service = Optional.ofNullable(System.getenv("service"))
             .orElse("smithy.java.codegen.kestrel.test#TestService");

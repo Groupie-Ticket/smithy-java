@@ -5,8 +5,6 @@
 
 package software.amazon.smithy.java.server.protocols.restjson;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.ExecutionException;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.InputEventStreamingSdkOperation;
@@ -40,11 +38,11 @@ import software.amazon.smithy.model.traits.HttpTrait;
 
 final class RestJsonProtocol extends ServerProtocol {
 
-    private final List<Operation<?, ?>> operations = new ArrayList<>();
+
     private final Codec codec;
 
     public RestJsonProtocol(final Service service) {
-        this.operations.addAll(service.getAllOperations());
+        super(service);
         this.codec = JsonCodec.builder().useJsonName(true).useTimestampFormat(true).build();
     }
 
@@ -58,7 +56,7 @@ final class RestJsonProtocol extends ServerProtocol {
         String path = request.getUri().getPath();
         UriPattern uri = UriPattern.parse(path);
         Operation<?, ?> selectedOperation = null;
-        for (Operation<?, ?> operation : operations) {
+        for (Operation<?, ?> operation : getOperations()) {
             UriPattern uriPattern = operation.getApiOperation().schema().expectTrait(HttpTrait.class).getUri();
             if (uriPattern.equals(uri)) {
                 selectedOperation = operation;
