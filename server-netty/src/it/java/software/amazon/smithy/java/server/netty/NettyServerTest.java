@@ -21,6 +21,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.GZIPOutputStream;
 import org.junit.jupiter.api.Test;
 import smithy.java.codegen.server.test.kestrel.KestrelGetBeerInput;
+import smithy.java.codegen.server.test.kestrel.KestrelGetBeerOutput;
 import smithy.java.codegen.server.test.model.Beer;
 import smithy.java.codegen.server.test.model.BuzzEvent;
 import smithy.java.codegen.server.test.model.EchoInput;
@@ -160,6 +161,7 @@ class NettyServerTest {
 
     @Test
     void testServer() {
+        GetBeer getBeer = new GetBeer();
         GetBeerInput getBeerInput = GetBeerInput.builder().id(10).build();
         KestrelGetBeerInput k = new KestrelGetBeerInput();
         k.convertFrom(getBeerInput);
@@ -170,6 +172,12 @@ class NettyServerTest {
         KestrelGetBeerInput k2 = new KestrelGetBeerInput();
         k2.decodeFrom(deserializer);
         assertEquals(getBeerInput, k2.convertTo());
+        var output = getBeer.getBeer(getBeerInput, null);
+        KestrelGetBeerOutput kOutput = new KestrelGetBeerOutput();
+        kOutput.convertFrom(output);
+        serializer = new KestrelSerializer(kOutput.size());
+        kOutput.encodeTo(serializer);
+        System.out.println(Base64.getEncoder().encodeToString(serializer.payload()));
         var server = Server.builder(URI.create("http://localhost:8080"))
             .addService(
                 TestService.builder()

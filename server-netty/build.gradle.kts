@@ -48,6 +48,7 @@ sourceSets {
         }
         resources {
             srcDir(generatedSrcDir)
+            include("META-INF/**")
         }
     }
 }
@@ -57,6 +58,9 @@ tasks {
         dependsOn(generateSrcTask)
     }
     compileItJava {
+        dependsOn(generateSrcTask)
+    }
+    processItResources {
         dependsOn(generateSrcTask)
     }
     spotbugsIt {
