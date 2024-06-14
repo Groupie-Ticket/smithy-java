@@ -16,5 +16,7 @@ public final class HttpAttributes {
 
     public static final Context.Key<HttpHeaders> HTTP_HEADERS = Context.key("http-headers");
 
+    public static final Context.Key<String> HTTP_METHOD = Context.key("http-method");
+
     public static final Context.Key<URI> HTTP_URI = Context.key("http-uri");
 }

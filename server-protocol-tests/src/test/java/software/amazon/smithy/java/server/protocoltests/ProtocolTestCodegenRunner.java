@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.server.protocoltests;
 
 import java.nio.file.Paths;
+import java.util.Collections;
 import software.amazon.smithy.build.FileManifest;
 import software.amazon.smithy.build.PluginContext;
 import software.amazon.smithy.java.codegen.server.JavaServerCodegenPlugin;
@@ -13,8 +14,6 @@ import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.node.ObjectNode;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.transform.ModelTransformer;
-
-import java.util.Collections;
 
 public final class ProtocolTestCodegenRunner {
 
