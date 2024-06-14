@@ -5,10 +5,10 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
-import java.util.Map;
+import static software.amazon.smithy.java.codegen.CodegenUtils.getEnumValues;
+
 import java.util.Objects;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.ShapeDirective;
@@ -23,8 +23,6 @@ import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.Model;
-import software.amazon.smithy.model.shapes.EnumShape;
-import software.amazon.smithy.model.shapes.IntEnumShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.utils.SmithyInternalApi;
@@ -295,7 +293,7 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
             );
             writer.write(
                 """
-                    private Builder value(${value:T} value) {
+                    public Builder value(${value:T} value) {
                         this.value = ${^primitive}${objects:T}.requireNonNull(${/primitive}value${^primitive}, "Enum value cannot be null")${/primitive};
                         return this;
                     }
@@ -329,18 +327,5 @@ public final class EnumGenerator<T extends ShapeDirective<Shape, CodeGenerationC
             );
         }
         writer.popState();
-    }
-
-    private static Map<String, String> getEnumValues(Shape shape) {
-        if (shape instanceof EnumShape se) {
-            return se.getEnumValues();
-        } else if (shape instanceof IntEnumShape ie) {
-            return ie.getEnumValues()
-                .entrySet()
-                .stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().toString()));
-        } else {
-            throw new IllegalArgumentException("Expected Int enum or enum");
-        }
     }
 }

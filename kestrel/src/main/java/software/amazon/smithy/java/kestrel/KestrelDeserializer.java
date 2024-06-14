@@ -9,6 +9,7 @@ import static software.amazon.smithy.java.kestrel.KConstants.*;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
@@ -106,6 +107,10 @@ public final class KestrelDeserializer {
 
     public Date date() {
         return new Date(Math.round(d8() * 1000));
+    }
+
+    public Instant instant() {
+        return Instant.ofEpochMilli(Math.round(d8() * 1000));
     }
 
     public boolean bool() {

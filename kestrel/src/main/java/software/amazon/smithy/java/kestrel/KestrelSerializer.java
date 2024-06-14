@@ -9,6 +9,7 @@ import static software.amazon.smithy.java.kestrel.KConstants.*;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Date;
 import java.util.List;
 
@@ -141,6 +142,10 @@ public final class KestrelSerializer {
 
     public void writeDate(Date d) {
         writeDouble(d.getTime() / 1000d);
+    }
+
+    public void writeInstant(Instant i) {
+        writeDouble(i.toEpochMilli() / 1000d);
     }
 
     public void writeBytes(ByteBuffer b) {

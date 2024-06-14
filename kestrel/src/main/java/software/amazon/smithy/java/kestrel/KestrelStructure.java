@@ -9,6 +9,4 @@ public interface KestrelStructure<T> extends KestrelObject {
     Class<? extends T> getConvertedType();
 
     T convertTo();
-
-    void convertFrom(T object);
 }

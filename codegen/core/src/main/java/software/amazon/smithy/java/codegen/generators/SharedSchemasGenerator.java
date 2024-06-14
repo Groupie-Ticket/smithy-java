@@ -65,6 +65,7 @@ public final class SharedSchemasGenerator
                             private SharedSchemas() {}
                         }
                         """;
+
                     writer.putContext(
                         "schemas",
                         new SchemasGenerator(

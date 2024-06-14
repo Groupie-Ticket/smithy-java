@@ -57,9 +57,10 @@ record StructureSerializerGenerator(
 
             writer.pushState();
             writer.putContext("nullable", CodegenUtils.isNullableMember(member));
+            writer.putContext("state", state);
             writer.putContext("memberName", memberName);
             writer.write("""
-                ${?nullable}if (${memberName:L} != null) {
+                ${?nullable}if (${state:L} != null) {
                     ${/nullable}${C|};${?nullable}
                 }${/nullable}
                 """, new SerializerMemberGenerator(writer, symbolProvider, model, service, member, state));

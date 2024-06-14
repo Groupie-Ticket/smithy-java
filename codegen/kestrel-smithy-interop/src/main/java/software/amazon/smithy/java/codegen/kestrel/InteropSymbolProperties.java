@@ -13,4 +13,5 @@ public class InteropSymbolProperties {
     private InteropSymbolProperties() {}
 
     public final static Property<Symbol> SMITHY_SYMBOL = Property.named("smithy-symbol");
+    public final static Property<String> SMITHY_MEMBER = Property.named("smithy-member");
 }

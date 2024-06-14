@@ -54,10 +54,12 @@ public class KestrelSymbolVisitor implements SymbolProvider, ShapeVisitor<Symbol
     private final Model model;
     private final ReservedWordSymbolProvider.Escaper escaper;
     private final ServiceShape service;
+    private final KestrelSettings kestrelSettings;
 
-    public KestrelSymbolVisitor(Model model, ServiceShape service) {
+    public KestrelSymbolVisitor(Model model, ServiceShape service, KestrelSettings kestrelSettings) {
         this.model = model;
         this.service = service;
+        this.kestrelSettings = kestrelSettings;
 
         // Load reserved words from new-line delimited files.
         var reservedWords = new ReservedWordsBuilder()
@@ -341,6 +343,9 @@ public class KestrelSymbolVisitor implements SymbolProvider, ShapeVisitor<Symbol
 
     @Override
     public Symbol timestampShape(TimestampShape shape) {
+        if (kestrelSettings.useInstant()) {
+            return createSymbolBuilder(shape, "Instant", "java.time").build();
+        }
         return createSymbolBuilder(shape, "Date", "java.util").build();
     }
 

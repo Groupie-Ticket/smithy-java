@@ -8,6 +8,7 @@ package software.amazon.smithy.java.codegen;
 import java.net.URL;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import software.amazon.smithy.codegen.core.ReservedWords;
@@ -18,9 +19,7 @@ import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.loader.Prelude;
-import software.amazon.smithy.model.shapes.MemberShape;
-import software.amazon.smithy.model.shapes.ServiceShape;
-import software.amazon.smithy.model.shapes.Shape;
+import software.amazon.smithy.model.shapes.*;
 import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.model.traits.UnitTypeTrait;
 import software.amazon.smithy.utils.CaseUtils;
@@ -308,5 +307,18 @@ public final class CodegenUtils {
      */
     public static String toUpperSnakeCase(String string) {
         return CaseUtils.toSnakeCase(string).toUpperCase(Locale.ENGLISH);
+    }
+
+    public static Map<String, String> getEnumValues(Shape shape) {
+        if (shape instanceof EnumShape se) {
+            return se.getEnumValues();
+        } else if (shape instanceof IntEnumShape ie) {
+            return ie.getEnumValues()
+                .entrySet()
+                .stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().toString()));
+        } else {
+            throw new IllegalArgumentException("Expected Int enum or enum");
+        }
     }
 }
