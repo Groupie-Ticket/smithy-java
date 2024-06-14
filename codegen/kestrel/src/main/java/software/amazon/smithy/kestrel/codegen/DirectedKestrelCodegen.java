@@ -23,7 +23,7 @@ public final class DirectedKestrelCodegen implements
     public SymbolProvider createSymbolProvider(CreateSymbolProviderDirective<KestrelSettings> directive) {
         var model = directive.model();
         var service = model.expectShape(directive.settings().getService(), ServiceShape.class);
-        return new KestrelSymbolVisitor(model, service);
+        return new KestrelSymbolVisitor(model, service, directive.settings());
     }
 
     @Override
@@ -62,7 +62,8 @@ public final class DirectedKestrelCodegen implements
                 directive.shape(),
                 directive.model(),
                 directive.context().symbolProvider(),
-                writer
+                writer,
+                directive.settings()
             ).run();
         });
     }

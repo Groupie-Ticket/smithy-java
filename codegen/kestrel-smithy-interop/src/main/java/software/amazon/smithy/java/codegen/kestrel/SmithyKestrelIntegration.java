@@ -26,7 +26,7 @@ public class SmithyKestrelIntegration implements KestrelIntegration {
 
     @Override
     public SymbolProvider decorateSymbolProvider(Model model, KestrelSettings settings, SymbolProvider symbolProvider) {
-        return new SmithySymbolVisitor(model, model.expectShape(settings.getService(), ServiceShape.class));
+        return new SmithySymbolVisitor(model, model.expectShape(settings.getService(), ServiceShape.class), settings);
     }
 
     @Override

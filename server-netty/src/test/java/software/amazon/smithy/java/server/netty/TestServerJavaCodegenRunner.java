@@ -29,18 +29,24 @@ public final class TestServerJavaCodegenRunner {
             .discoverModels(TestServerJavaCodegenRunner.class.getClassLoader())
             .assemble()
             .unwrap();
+
         System.out.println("WRITING TO : " + System.getenv("output"));
-        PluginContext context = PluginContext.builder()
-            .fileManifest(FileManifest.create(Paths.get(System.getenv("output"))))
-            .settings(
-                ObjectNode.builder()
-                    .withMember("service", System.getenv("service"))
-                    .withMember("namespace", System.getenv("namespace"))
-                    .build()
-            )
-            .model(model)
-            .build();
-        plugin.execute(context);
-        kestrelPlugin.execute(context);
+        String serviceEnv = System.getenv("service");
+        String[] services = serviceEnv.split(",");
+        for (String service : services) {
+            PluginContext context = PluginContext.builder()
+                .fileManifest(FileManifest.create(Paths.get(System.getenv("output"))))
+                .settings(
+                    ObjectNode.builder()
+                        .withMember("service", service)
+                        .withMember("namespace", service.split("#")[0])
+                        .withMember("useInstantForTimestamp", true)
+                        .build()
+                )
+                .model(model)
+                .build();
+            plugin.execute(context);
+            kestrelPlugin.execute(context);
+        }
     }
 }

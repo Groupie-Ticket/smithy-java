@@ -52,16 +52,24 @@ import software.amazon.smithy.model.traits.SparseTrait;
 public final class StructureGenerator implements Runnable {
     private final Shape shape;
     private final SymbolProvider symbolProvider;
+    private final KestrelSettings settings;
     private final Symbol symbol;
     private final Model model;
     private final KestrelIndex index;
     private final List<FieldSet> fieldSets = new ArrayList<>();
     private final JavaWriter writer;
 
-    StructureGenerator(Shape shape, Model model, SymbolProvider symbolProvider, JavaWriter writer) {
+    StructureGenerator(
+        Shape shape,
+        Model model,
+        SymbolProvider symbolProvider,
+        JavaWriter writer,
+        KestrelSettings settings
+    ) {
         this.shape = shape;
         this.model = model;
         this.symbolProvider = symbolProvider;
+        this.settings = settings;
         this.symbol = symbolProvider.toSymbol(shape);
         this.writer = writer;
         this.index = KestrelIndex.of(model);
@@ -824,7 +832,7 @@ public final class StructureGenerator implements Runnable {
                                 }
                                 String m = method;
                                 if (model.expectShape(field.getTarget()).isTimestampShape()) {
-                                    m = "Date";
+                                    m = settings.useInstant() ? "Instant" : "Date";
                                 }
                                 writer.write("s.write$L($L);", m, fieldName(field));
                                 if (isOptional(field)) {
@@ -1008,7 +1016,7 @@ public final class StructureGenerator implements Runnable {
                     }
                     String m = method;
                     if (model.expectShape(field.getTarget()).isTimestampShape()) {
-                        m = "date";
+                        m = settings.useInstant() ? "instant" : "date";
                     }
                     writer.write("this.$L = d.$L();", fieldName(field), m);
                     if (isOptional(field)) {

@@ -5,10 +5,12 @@
 
 package software.amazon.smithy.java.codegen.kestrel;
 
+import static software.amazon.smithy.java.codegen.kestrel.InteropSymbolProperties.SMITHY_MEMBER;
 import static software.amazon.smithy.java.codegen.kestrel.InteropSymbolProperties.SMITHY_SYMBOL;
 
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.java.codegen.JavaSymbolProvider;
+import software.amazon.smithy.kestrel.codegen.KestrelSettings;
 import software.amazon.smithy.kestrel.codegen.KestrelSymbolVisitor;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.*;
@@ -18,8 +20,8 @@ public class SmithySymbolVisitor extends KestrelSymbolVisitor {
 
     private final JavaSymbolProvider smithySymbolProvider;
 
-    public SmithySymbolVisitor(Model model, ServiceShape service) {
-        super(model, service);
+    public SmithySymbolVisitor(Model model, ServiceShape service, KestrelSettings settings) {
+        super(model, service, settings);
         this.smithySymbolProvider = new JavaSymbolProvider(model, service, service.getId().getNamespace());
     }
 
@@ -27,7 +29,7 @@ public class SmithySymbolVisitor extends KestrelSymbolVisitor {
     public Symbol memberShape(MemberShape shape) {
         return super.memberShape(shape).toBuilder()
             .putProperty(SMITHY_SYMBOL, smithySymbolProvider.memberShape(shape))
-            .putProperty("smithyMemberName", smithySymbolProvider.toMemberName(shape))
+            .putProperty(SMITHY_MEMBER, smithySymbolProvider.toMemberName(shape))
             .build();
     }
 

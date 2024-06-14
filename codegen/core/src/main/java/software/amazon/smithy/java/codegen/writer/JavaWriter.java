@@ -40,6 +40,7 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
         putFormatter('T', new JavaTypeFormatter());
         putFormatter('B', new BoxedTypeFormatter());
         putFormatter('U', new CapitalizingFormatter());
+        putFormatter('S', new ToStringFormatter());
     }
 
     // Java does not support aliases, so just import normally
@@ -204,4 +205,34 @@ public class JavaWriter extends DeferredSymbolWriter<JavaWriter, JavaImportConta
             );
         }
     }
+
+    private static final class ToStringFormatter implements BiFunction<Object, String, String> {
+        @Override
+        public String apply(Object type, String indent) {
+            String formatted = replaceOddDollars(formatLiteral(type));
+            return StringUtils.escapeJavaString(formatted, indent);
+        }
+
+        private String replaceOddDollars(String input) {
+            StringBuilder result = new StringBuilder();
+            int i = 0;
+            int len = input.length();
+            char[] arr = input.toCharArray();
+            while (i < len) {
+                char x = arr[i];
+                if (x != '$') {
+                    result.append(x);
+                    i++;
+                    continue;
+                }
+                int start = i;
+                while (arr[i] == '$' && ++i < len);
+                int n = i - start;
+                result.append("$".repeat(n + (n & 1)));
+            }
+            return result.toString();
+        }
+    }
+
+
 }
