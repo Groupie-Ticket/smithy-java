@@ -37,6 +37,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicReference;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
+import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.core.ByteValue;
 import software.amazon.smithy.java.server.core.Job;
 import software.amazon.smithy.java.server.core.JobImpl;
@@ -48,8 +49,11 @@ import software.amazon.smithy.java.server.core.ReplyImpl;
 import software.amazon.smithy.java.server.core.Request;
 import software.amazon.smithy.java.server.core.RequestImpl;
 import software.amazon.smithy.java.server.core.ResolutionRequest;
+import software.amazon.smithy.java.server.core.ServerProtocol;
 import software.amazon.smithy.java.server.core.Value;
 import software.amazon.smithy.java.server.core.attributes.HttpAttributes;
+import software.amazon.smithy.java.server.exceptions.UnknownOperationException;
+import software.amazon.smithy.utils.Pair;
 
 final class NettyHandler extends ChannelDuplexHandler {
 
@@ -72,18 +76,32 @@ final class NettyHandler extends ChannelDuplexHandler {
         if (msg instanceof HttpRequest httpRequest) {
             URI uri = URI.create(httpRequest.uri());
             HttpHeaders headers = getHeaders(httpRequest);
-            var operationProtocolPair = protocolResolver.resolveOperation(
-                ResolutionRequest
-                    .builder()
-                    .uri(uri)
-                    .verb(httpRequest.method().name())
-                    .headers(headers)
-                    .build()
-            );
+
+            Pair<Operation<?, ?>, ServerProtocol> operationProtocolPair;
+            try {
+                operationProtocolPair = protocolResolver.resolveOperation(
+                    ResolutionRequest
+                        .builder()
+                        .uri(uri)
+                        .verb(httpRequest.method().name())
+                        .headers(headers)
+                        .build()
+                );
+            } catch (UnknownOperationException e) {
+                e.printStackTrace();
+                HttpResponse response = new DefaultFullHttpResponse(
+                    HttpVersion.HTTP_1_1,
+                    HttpResponseStatus.NOT_FOUND
+                );
+                ctx.writeAndFlush(response);
+                channel.close();
+                return;
+            }
             operation = operationProtocolPair.left.getApiOperation();
             Request request = createRequest(httpRequest);
             request.getContext().put(HttpAttributes.HTTP_HEADERS, headers);
             request.getContext().put(HttpAttributes.HTTP_URI, uri);
+            request.getContext().put(HttpAttributes.HTTP_METHOD, httpRequest.method().toString());
 
             job = new JobImpl(request, new ReplyImpl(), operationProtocolPair.left, operationProtocolPair.right);
 

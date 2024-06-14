@@ -14,12 +14,13 @@ import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.EventStreamFrameEncodingProcessor;
+import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.binding.AwsFlowFrame;
 import software.amazon.smithy.java.runtime.http.binding.AwsFlowFrameEncoder;
 import software.amazon.smithy.java.runtime.http.binding.AwsFlowShapeDecoder;
 import software.amazon.smithy.java.runtime.http.binding.AwsFlowShapeEncoder;
 import software.amazon.smithy.java.runtime.http.binding.BindingMatcher;
-import software.amazon.smithy.java.runtime.http.binding.HttpBindingDeserializer;
+import software.amazon.smithy.java.runtime.http.binding.HttpBinding;
 import software.amazon.smithy.java.runtime.http.binding.HttpBindingSerializer;
 import software.amazon.smithy.java.runtime.json.JsonCodec;
 import software.amazon.smithy.java.server.Operation;
@@ -69,16 +70,20 @@ final class RestJsonProtocol extends ServerProtocol {
     @Override
     public void deserializeInput(Job job) {
         ShapeBuilder<? extends SerializableStruct> shapeBuilder = job.operation().getApiOperation().inputBuilder();
-        HttpBindingDeserializer.Builder builder = HttpBindingDeserializer.builder()
-            .request(true)
-            .body(getDataStream(job.request().getValue()))
-            .payloadCodec(codec)
-            .shapeBuilder(shapeBuilder)
-            .requestPath(job.request().getContext().get(HttpAttributes.HTTP_URI).getPath())
-            .headers(job.request().getContext().get(HttpAttributes.HTTP_HEADERS));
+        var deser = HttpBinding.requestDeserializer()
+            .inputShapeBuilder(shapeBuilder)
+            .request(
+                SmithyHttpRequest.builder()
+                    .headers(job.request().getContext().get(HttpAttributes.HTTP_HEADERS))
+                    .uri(job.request().getContext().get(HttpAttributes.HTTP_URI))
+                    .method(job.request().getContext().get(HttpAttributes.HTTP_METHOD))
+                    .body(getDataStream(job.request().getValue()))
+                    .build()
+            )
+            .payloadCodec(codec);
 
         if (job.operation().getApiOperation() instanceof InputEventStreamingSdkOperation<?, ?, ?> streamingOp) {
-            builder.eventDecoder(
+            deser.eventDecoder(
                 new AwsFlowShapeDecoder<>(
                     streamingOp::inputEventBuilder,
                     streamingOp.inputEventSchema(),
@@ -87,8 +92,19 @@ final class RestJsonProtocol extends ServerProtocol {
             );
         }
 
-        job.request().setValue(new ShapeValue<>(shapeBuilder.deserialize(builder.build()).build()));
+        try {
+            deser.deserialize().get();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(e);
+        } catch (ExecutionException e) {
+            if (e.getCause() instanceof RuntimeException re) {
+                throw re;
+            }
+            throw new RuntimeException(e.getCause());
+        }
 
+        job.request().setValue(new ShapeValue<>(shapeBuilder.build()));
     }
 
     private DataStream getDataStream(Value value) {
