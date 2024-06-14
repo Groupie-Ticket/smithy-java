@@ -163,8 +163,7 @@ class NettyServerTest {
     void testServer() {
         GetBeer getBeer = new GetBeer();
         GetBeerInput getBeerInput = GetBeerInput.builder().id(10).build();
-        KestrelGetBeerInput k = new KestrelGetBeerInput();
-        k.convertFrom(getBeerInput);
+        KestrelGetBeerInput k = KestrelGetBeerInput.convertFrom(getBeerInput);
         KestrelSerializer serializer = new KestrelSerializer(k.size());
         k.encodeTo(serializer);
         System.out.println(Base64.getEncoder().encodeToString(serializer.payload()));
@@ -173,8 +172,7 @@ class NettyServerTest {
         k2.decodeFrom(deserializer);
         assertEquals(getBeerInput, k2.convertTo());
         var output = getBeer.getBeer(getBeerInput, null);
-        KestrelGetBeerOutput kOutput = new KestrelGetBeerOutput();
-        kOutput.convertFrom(output);
+        KestrelGetBeerOutput kOutput = KestrelGetBeerOutput.convertFrom(output);
         serializer = new KestrelSerializer(kOutput.size());
         kOutput.encodeTo(serializer);
         System.out.println(Base64.getEncoder().encodeToString(serializer.payload()));

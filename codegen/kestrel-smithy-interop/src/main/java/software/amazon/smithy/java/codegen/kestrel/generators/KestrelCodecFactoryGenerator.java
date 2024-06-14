@@ -159,9 +159,7 @@ public class KestrelCodecFactoryGenerator implements Consumer<JavaWriter> {
 
                         @Override
                         public byte[] encode(${output:T} value) {
-                            ${kestrelOutput:T} converted = new ${kestrelOutput:T}();
-                            converted.convertFrom(value);
-                            return serialize(converted);
+                            return serialize(${kestrelOutput:T}.convertFrom(value));
                         }
 
                         @Override
