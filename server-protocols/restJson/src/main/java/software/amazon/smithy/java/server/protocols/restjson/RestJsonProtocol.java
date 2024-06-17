@@ -5,6 +5,10 @@
 
 package software.amazon.smithy.java.server.protocols.restjson;
 
+import java.net.http.HttpHeaders;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import software.amazon.smithy.java.runtime.core.schema.*;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
@@ -29,9 +33,11 @@ import software.amazon.smithy.java.server.core.ServerProtocol;
 import software.amazon.smithy.java.server.core.ShapeValue;
 import software.amazon.smithy.java.server.core.Value;
 import software.amazon.smithy.java.server.core.attributes.HttpAttributes;
+import software.amazon.smithy.java.server.exceptions.ExceptionWrapper;
 import software.amazon.smithy.java.server.exceptions.InternalServerException;
 import software.amazon.smithy.model.pattern.UriPattern;
 import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.model.traits.HttpErrorTrait;
 import software.amazon.smithy.model.traits.HttpTrait;
 
 final class RestJsonProtocol extends ServerProtocol {
@@ -120,12 +126,16 @@ final class RestJsonProtocol extends ServerProtocol {
         ShapeValue<? extends SerializableStruct> shapeValue = job.reply().getValue();
         Schema schema;
         SerializableStruct value = shapeValue.get();
+        HttpErrorTrait errorTrait = null;
         if (value instanceof Exception e) {
             if (e instanceof ModeledApiException me) {
                 schema = apiOperation.exceptionSchema(me);
+                errorTrait = schema.expectTrait(HttpErrorTrait.class);
+                value = new ExceptionWrapper(me, schema);
             } else {
-                value = new InternalServerException(e);
                 schema = InternalServerException.SCHEMA;
+                value = new ExceptionWrapper(new InternalServerException(e), schema);
+                errorTrait = schema.expectTrait(HttpErrorTrait.class);
             }
         } else {
             schema = apiOperation.outputSchema();
@@ -138,9 +148,13 @@ final class RestJsonProtocol extends ServerProtocol {
         );
         serializer.writeStruct(schema, value);
         serializer.flush();
-        int responseStatus = serializer.getResponseStatus();
-        job.reply().context().put(HttpAttributes.HTTP_HEADERS, serializer.getHeaders());
-        job.reply().context().put(HttpAttributes.STATUS_CODE, responseStatus > 0 ? responseStatus : 200);
+        int responseStatus = errorTrait != null ? errorTrait.getCode() : 200;
+        HttpHeaders headers = serializer.getHeaders();
+        if (errorTrait != null) {
+            headers = addHeader(headers, "X-Amzn-ErrorType", schema.id().getName());
+        }
+        job.reply().context().put(HttpAttributes.HTTP_HEADERS, headers);
+        job.reply().context().put(HttpAttributes.STATUS_CODE, responseStatus);
 
         if (apiOperation instanceof OutputEventStreamingSdkOperation<?, ?, ?> outputStreamingOp) {
             EventStreamFrameEncodingProcessor<AwsFlowFrame, ?> stream = new EventStreamFrameEncodingProcessor<>(
@@ -162,5 +176,11 @@ final class RestJsonProtocol extends ServerProtocol {
                 throw new RuntimeException(e);
             }
         }
+    }
+
+    private HttpHeaders addHeader(HttpHeaders headers, String name, String value) {
+        Map<String, List<String>> copy = new HashMap<>(headers.map());
+        copy.put(name, List.of(value));
+        return HttpHeaders.of(copy, (k, v) -> true);
     }
 }
