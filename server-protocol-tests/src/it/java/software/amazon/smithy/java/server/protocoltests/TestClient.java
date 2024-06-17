@@ -104,7 +104,7 @@ final class TestClient {
 
             @Override
             protected void channelRead0(ChannelHandlerContext ctx, FullHttpResponse msg) throws Exception {
-                cf.complete(msg);
+                cf.complete(msg.duplicate());
             }
 
             @Override

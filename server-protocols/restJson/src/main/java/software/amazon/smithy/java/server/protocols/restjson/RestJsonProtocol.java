@@ -40,7 +40,7 @@ import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.HttpErrorTrait;
 import software.amazon.smithy.model.traits.HttpTrait;
 
-final class RestJsonProtocol extends ServerProtocol {
+public final class RestJsonProtocol extends ServerProtocol {
 
 
     private final Codec codec;

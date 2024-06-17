@@ -9,6 +9,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import aws.protocoltests.restjson.model.PayloadConfig;
 import aws.protocoltests.restjson.model.TestPayloadStructureInput;
+import io.netty.buffer.Unpooled;
+import io.netty.handler.codec.http.DefaultFullHttpRequest;
+import io.netty.handler.codec.http.DefaultHttpHeaders;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpMethod;
+import io.netty.handler.codec.http.HttpVersion;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandleProxies;
 import java.lang.invoke.MethodHandles;
@@ -16,8 +23,10 @@ import java.lang.invoke.MethodType;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -52,6 +61,8 @@ import software.amazon.smithy.model.transform.ModelTransformer;
 import software.amazon.smithy.protocoltests.traits.AppliesTo;
 import software.amazon.smithy.protocoltests.traits.HttpRequestTestCase;
 import software.amazon.smithy.protocoltests.traits.HttpRequestTestsTrait;
+import software.amazon.smithy.protocoltests.traits.HttpResponseTestCase;
+import software.amazon.smithy.protocoltests.traits.HttpResponseTestsTrait;
 
 public class EndToEndProtocolTests {
     // If this is non-empty, only the test names (from the trait, not the operation name) within will run
@@ -69,8 +80,11 @@ public class EndToEndProtocolTests {
     );
 
     private record TestOperation(
-        ShapeId operationId, MockOperation mock, Supplier<ShapeBuilder<?>> builderSupplier,
-        List<HttpRequestTestCase> requestTestCases
+        ShapeId operationId, MockOperation mock,
+        Supplier<ShapeBuilder<?>> inputBuilderSupplier,
+        List<HttpRequestTestCase> requestTestCases,
+        Supplier<ShapeBuilder<?>> outputBuilderSupplier,
+        List<HttpResponseTestCase> responseTestCases
     ) {}
 
     private record TestService(
@@ -120,6 +134,7 @@ public class EndToEndProtocolTests {
                     .forEach(operationShape -> {
                         var mock = new MockOperation(operationShape.getId());
                         Supplier<ShapeBuilder<?>> inputBuilderSupplier;
+                        Supplier<ShapeBuilder<?>> outputBuilderSupplier;
                         try {
                             Class<?> inputType = Class.forName(
                                 sp.toSymbol(serviceModel.expectShape(operationShape.getInputShape()))
@@ -129,12 +144,34 @@ public class EndToEndProtocolTests {
                                 sp.toSymbol(serviceModel.expectShape(operationShape.getInputShape()))
                                     .toString() + "$Builder"
                             );
-                            MethodHandle builder = caller.findStatic(
+                            MethodHandle inputBuilder = caller.findStatic(
                                 inputType,
                                 "builder",
                                 MethodType.methodType(inputBuilderType)
                             );
-                            inputBuilderSupplier = MethodHandleProxies.asInterfaceInstance(Supplier.class, builder);
+                            inputBuilderSupplier = MethodHandleProxies.asInterfaceInstance(
+                                Supplier.class,
+                                inputBuilder
+                            );
+
+
+                            Class<?> outputType = Class.forName(
+                                sp.toSymbol(serviceModel.expectShape(operationShape.getOutputShape()))
+                                    .toString()
+                            );
+                            Class<?> outputBuilderType = Class.forName(
+                                sp.toSymbol(serviceModel.expectShape(operationShape.getOutputShape()))
+                                    .toString() + "$Builder"
+                            );
+                            MethodHandle outputBuilder = caller.findStatic(
+                                outputType,
+                                "builder",
+                                MethodType.methodType(outputBuilderType)
+                            );
+                            outputBuilderSupplier = MethodHandleProxies.asInterfaceInstance(
+                                Supplier.class,
+                                outputBuilder
+                            );
                         } catch (Throwable t) {
                             throw new RuntimeException(t);
                         }
@@ -152,7 +189,19 @@ public class EndToEndProtocolTests {
                                             )
                                             .toList()
                                     )
+                                    .orElse(Collections.emptyList()),
+                                outputBuilderSupplier,
+                                operationShape.getTrait(HttpResponseTestsTrait.class)
+                                    .map(
+                                        hrt -> hrt.getTestCases()
+                                            .stream()
+                                            .filter(
+                                                tc -> tc.getAppliesTo().orElse(AppliesTo.SERVER) == AppliesTo.SERVER
+                                            )
+                                            .toList()
+                                    )
                                     .orElse(Collections.emptyList())
+
                             )
                         );
                         String cappedName = CodegenUtils.getDefaultName(operationShape, serviceShape);
@@ -256,6 +305,65 @@ public class EndToEndProtocolTests {
         assertEquals(deserializedRequest, captor.get());
     }
 
+    @TestTemplate
+    @ExtendWith(ResponseTestInvocationContextProvider.class)
+    void responseTest(
+        URI endpoint,
+        ServiceCoordinate serviceCoordinate,
+        HttpResponse rawResponse,
+        SerializableShape deserializedResponse,
+        MockOperation mock
+    ) {
+        mock.setResponse(deserializedResponse);
+        var c = getClient(endpoint);
+        assertEquals(
+            rawResponse,
+            convertResponse(
+                c.call(getTestRequest(endpoint, serviceCoordinate.serviceId(), serviceCoordinate.operationId()))
+            )
+        );
+    }
+
+    private HttpResponse convertResponse(FullHttpResponse response) {
+        var headersMap = new HashMap<String, String>();
+        response.headers().forEach(e -> {
+            headersMap.compute(e.getKey(), (k, oldV) -> {
+                if (oldV == null) {
+                    return e.getValue();
+                }
+                return oldV + ", " + e.getValue();
+            });
+        });
+        if ("0".equals(headersMap.get("content-length"))) {
+            headersMap.remove("content-length");
+        }
+
+        Optional<String> body;
+        if (response.content().readableBytes() == 0) {
+            body = Optional.empty();
+        } else {
+            body = Optional.of(response.content().toString(StandardCharsets.UTF_8));
+        }
+        return new HttpResponse(
+            response.status().code(),
+            headersMap,
+            body,
+            Optional.ofNullable(response.headers().get(HttpHeaderNames.CONTENT_TYPE))
+        );
+    }
+
+    private DefaultFullHttpRequest getTestRequest(URI endpoint, ShapeId serviceId, ShapeId operationId) {
+        return new DefaultFullHttpRequest(
+            HttpVersion.HTTP_1_1,
+            HttpMethod.POST,
+            endpoint.getPath(),
+            Unpooled.EMPTY_BUFFER,
+            new DefaultHttpHeaders().add("x-protocol-test-service", serviceId.toString())
+                .add("x-protocol-test-operation", operationId.toString()),
+            new DefaultHttpHeaders()
+        );
+    }
+
     private TestClient getClient(URI endpoint) {
         return clients.computeIfAbsent(endpoint, $ -> new TestClient(endpoint));
     }
@@ -284,7 +392,7 @@ public class EndToEndProtocolTests {
                                     endpoint,
                                     tc,
                                     to.mock(),
-                                    to.builderSupplier(),
+                                    to.inputBuilderSupplier(),
                                     MANUAL_EXPECTATIONS.get(tc.getId())
                                 )
                             );
@@ -296,9 +404,53 @@ public class EndToEndProtocolTests {
         }
     }
 
+    public static class ResponseTestInvocationContextProvider implements TestTemplateInvocationContextProvider {
+
+        public ResponseTestInvocationContextProvider() {}
+
+        @Override
+        public boolean supportsTestTemplate(ExtensionContext extensionContext) {
+            return true;
+        }
+
+        @Override
+        public Stream<TestTemplateInvocationContext> provideTestTemplateInvocationContexts(
+            ExtensionContext extensionContext
+        ) {
+            List<TestTemplateInvocationContext> contexts = new ArrayList<>();
+            for (TestService ts : testServices) {
+                URI endpoint = URI.create("http://localhost:" + ts.testPort);
+                for (TestOperation to : ts.operations()) {
+                    for (HttpResponseTestCase tc : to.responseTestCases()) {
+                        if (ONLY_RUN_THESE_TESTS.isEmpty() || ONLY_RUN_THESE_TESTS.contains(tc.getId())) {
+                            contexts.add(
+                                new ResponseTestInvocationContext(
+                                    endpoint,
+                                    ts.serviceId(),
+                                    to.operationId(),
+                                    tc,
+                                    to.mock(),
+                                    to.outputBuilderSupplier(),
+                                    MANUAL_EXPECTATIONS.get(tc.getId())
+                                )
+                            );
+                        }
+                    }
+                }
+            }
+            return contexts.stream();
+        }
+    }
+
+    record ServiceCoordinate(ShapeId serviceId, ShapeId operationId) {}
+
     record HttpRequest(
         String method, String uri, List<String> queryParams, Map<String, String> headers,
         Optional<String> body, Optional<String> bodyMediaType
+    ) {}
+
+    record HttpResponse(
+        int code, Map<String, String> headers, Optional<String> body, Optional<String> bodyMediaType
     ) {}
 
 }
