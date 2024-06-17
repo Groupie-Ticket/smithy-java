@@ -102,10 +102,10 @@ public final class HttpBindingSerializer extends SpecificShapeSerializer impleme
         if (foundBody || !foundPayload) {
             shapeBodyOutput = new ByteArrayOutputStream();
             shapeBodySerializer = payloadCodec.createSerializer(shapeBodyOutput);
-            struct.serialize(new BindingSerializer(this, shapeBodySerializer));
+            struct.serializeMembers(new BindingSerializer(this, shapeBodySerializer));
             headers.put("Content-Type", List.of(payloadCodec.getMediaType()));
         } else {
-            struct.serialize(new BindingSerializer(this, null));
+            struct.serializeMembers(new BindingSerializer(this, null));
         }
     }
 
