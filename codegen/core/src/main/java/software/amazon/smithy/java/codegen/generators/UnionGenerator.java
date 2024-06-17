@@ -5,6 +5,10 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
+import java.util.function.Consumer;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.directed.GenerateUnionDirective;
 import software.amazon.smithy.java.codegen.CodeGenerationContext;
@@ -23,11 +27,6 @@ import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.UnionShape;
 import software.amazon.smithy.utils.SmithyInternalApi;
-
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
-import java.util.function.Consumer;
 
 @SmithyInternalApi
 public final class UnionGenerator

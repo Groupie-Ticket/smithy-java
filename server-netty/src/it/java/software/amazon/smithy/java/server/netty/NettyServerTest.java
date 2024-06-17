@@ -22,21 +22,7 @@ import java.util.zip.GZIPOutputStream;
 import org.junit.jupiter.api.Test;
 import smithy.java.codegen.server.test.kestrel.KestrelGetBeerInput;
 import smithy.java.codegen.server.test.kestrel.KestrelGetBeerOutput;
-import smithy.java.codegen.server.test.model.Beer;
-import smithy.java.codegen.server.test.model.BuzzEvent;
-import smithy.java.codegen.server.test.model.EchoInput;
-import smithy.java.codegen.server.test.model.EchoOutput;
-import smithy.java.codegen.server.test.model.FizzBuzzInput;
-import smithy.java.codegen.server.test.model.FizzBuzzOutput;
-import smithy.java.codegen.server.test.model.FizzBuzzStream;
-import smithy.java.codegen.server.test.model.FizzEvent;
-import smithy.java.codegen.server.test.model.GetBeerInput;
-import smithy.java.codegen.server.test.model.GetBeerOutput;
-import smithy.java.codegen.server.test.model.HashFileInput;
-import smithy.java.codegen.server.test.model.HashFileOutput;
-import smithy.java.codegen.server.test.model.ValueStream;
-import smithy.java.codegen.server.test.model.ZipFileInput;
-import smithy.java.codegen.server.test.model.ZipFileOutput;
+import smithy.java.codegen.server.test.model.*;
 import smithy.java.codegen.server.test.service.EchoOperation;
 import smithy.java.codegen.server.test.service.FizzBuzzOperation;
 import smithy.java.codegen.server.test.service.GetBeerOperation;
@@ -63,7 +49,13 @@ class NettyServerTest {
 
         @Override
         public GetBeerOutput getBeer(GetBeerInput input, RequestContext context) {
-            System.out.println("Beer invoked");
+            if (input.id() > 5 && input.id() < 10) {
+                throw NoSuchBeerException.builder().message("BeerId is greater than 5").build();
+            } else if (input.id() >= 10 && input.id() < 15) {
+                throw DependencyException.builder().message("BeerId is greater than 10").build();
+            } else if (input.id() >= 15) {
+                throw new RuntimeException("BeerId is greater than 15");
+            }
             return GetBeerOutput.builder().value(Beer.builder().name("Test Beer").build()).beerId(input.id()).build();
         }
     }
@@ -162,7 +154,7 @@ class NettyServerTest {
     @Test
     void testServer() {
         GetBeer getBeer = new GetBeer();
-        GetBeerInput getBeerInput = GetBeerInput.builder().id(10).build();
+        GetBeerInput getBeerInput = GetBeerInput.builder().id(2).build();
         KestrelGetBeerInput k = KestrelGetBeerInput.convertFrom(getBeerInput);
         KestrelSerializer serializer = new KestrelSerializer(k.size());
         k.encodeTo(serializer);

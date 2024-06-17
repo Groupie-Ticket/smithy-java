@@ -8,16 +8,16 @@ package software.amazon.smithy.java.server.core;
 import software.amazon.smithy.java.runtime.core.Context;
 import software.amazon.smithy.java.server.RequestContext;
 
-public sealed interface Request permits RequestImpl {
+public class RequestContextImpl implements RequestContext {
 
-    String getRequestId();
+    private final String requestId;
 
-    Context getContext();
+    public RequestContextImpl(String requestId, Context context) {
+        this.requestId = requestId;
+    }
 
-    <T extends Value> T getValue();
-
-    <T extends Value> void setValue(T value);
-
-    RequestContext userContext();
-
+    @Override
+    public String getRequestId() {
+        return requestId;
+    }
 }

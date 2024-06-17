@@ -19,4 +19,6 @@ public final class HttpAttributes {
     public static final Context.Key<String> HTTP_METHOD = Context.key("http-method");
 
     public static final Context.Key<URI> HTTP_URI = Context.key("http-uri");
+
+    public static final Context.Key<Integer> STATUS_CODE = Context.key("http-status-code");
 }
