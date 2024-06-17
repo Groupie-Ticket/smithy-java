@@ -5,10 +5,8 @@
 
 package software.amazon.smithy.java.server.protocoltests;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-
+import aws.protocoltests.restjson.model.PayloadConfig;
+import aws.protocoltests.restjson.model.TestPayloadStructureInput;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandleProxies;
 import java.lang.invoke.MethodHandles;
@@ -16,40 +14,24 @@ import java.lang.invoke.MethodType;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URI;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Stream;
-import org.assertj.core.util.Arrays;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestTemplate;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContextProvider;
-import software.amazon.smithy.cli.shaded.apache.commons.codec.Charsets;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.server.ServerSymbolProperties;
 import software.amazon.smithy.java.codegen.server.ServiceJavaSymbolProvider;
+import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
+import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.server.RequestContext;
 import software.amazon.smithy.java.server.Server;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.java.server.netty.NettyServerBuilder;
 import software.amazon.smithy.model.Model;
-import software.amazon.smithy.model.node.Node;
-import software.amazon.smithy.model.node.ObjectNode;
-import software.amazon.smithy.model.node.StringNode;
 import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -58,16 +40,39 @@ import software.amazon.smithy.protocoltests.traits.AppliesTo;
 import software.amazon.smithy.protocoltests.traits.HttpRequestTestCase;
 import software.amazon.smithy.protocoltests.traits.HttpRequestTestsTrait;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
+import java.util.stream.Stream;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 public class EndToEndProtocolTests {
     // If this is non-empty, only the test names (from the trait, not the operation name) within will run
     private static final Set<String> ONLY_RUN_THESE_TESTS = Set.of();
 
-
-    private static final Set<ShapeId> removedOperations = Set.of(
+    private static final Set<ShapeId> REMOVED_OPERATIONS = Set.of(
         ShapeId.from("aws.protocoltests.restjson#RecursiveShapes")
     );
 
-    private record TestOperation(ShapeId operationId, MockOperation mock, List<HttpRequestTestCase> requestTestCases) {}
+    private static final Map<String, SerializableShape> MANUAL_EXPECTATIONS = Map.of(
+        // Weird one: httpPayload binging moves this test's "{}" to apply to payloadConfig, but the
+        // document-based assertion is just an empty structure
+        "RestJsonHttpWithEmptyStructurePayload",
+        TestPayloadStructureInput.builder().payloadConfig(PayloadConfig.builder().build()).build()
+    );
+
+    private record TestOperation(
+        ShapeId operationId, MockOperation mock, Supplier<ShapeBuilder<?>> builderSupplier,
+        List<HttpRequestTestCase> requestTestCases
+    ) {}
 
     private record TestService(
         ShapeId serviceId,
@@ -115,10 +120,30 @@ public class EndToEndProtocolTests {
                     .map(s -> (OperationShape) s)
                     .forEach(operationShape -> {
                         var mock = new MockOperation(operationShape.getId());
+                        Supplier<ShapeBuilder<?>> inputBuilderSupplier;
+                        try {
+                            Class<?> inputType = Class.forName(
+                                sp.toSymbol(serviceModel.expectShape(operationShape.getInputShape()))
+                                    .toString()
+                            );
+                            Class<?> inputBuilderType = Class.forName(
+                                sp.toSymbol(serviceModel.expectShape(operationShape.getInputShape()))
+                                    .toString() + "$Builder"
+                            );
+                            MethodHandle builder = caller.findStatic(
+                                inputType,
+                                "builder",
+                                MethodType.methodType(inputBuilderType)
+                            );
+                            inputBuilderSupplier = MethodHandleProxies.asInterfaceInstance(Supplier.class, builder);
+                        } catch (Throwable t) {
+                            throw new RuntimeException(t);
+                        }
                         testOperations.add(
                             new TestOperation(
                                 operationShape.getId(),
                                 mock,
+                                inputBuilderSupplier,
                                 operationShape.getTrait(HttpRequestTestsTrait.class)
                                     .map(
                                         hrt -> hrt.getTestCases()
@@ -204,7 +229,7 @@ public class EndToEndProtocolTests {
             s -> s instanceof ServiceShape
                 && !s.getId().getNamespace().equals(NS)
         );
-        filtered = transformer.removeShapesIf(filtered, s -> removedOperations.contains(s.getId()));
+        filtered = transformer.removeShapesIf(filtered, s -> REMOVED_OPERATIONS.contains(s.getId()));
         return transformer.removeUnreferencedShapes(filtered);
     }
 
@@ -223,111 +248,13 @@ public class EndToEndProtocolTests {
     void requestTest(
         URI endpoint,
         HttpRequest rawRequest,
-        ObjectNode deserializedRequest,
+        SerializableShape deserializedRequest,
         MockOperation mock
     ) {
         var captor = mock.expectRequest();
         var c = getClient(endpoint);
         c.sendRequest(rawRequest);
-        assertStructuralEquivalence(deserializedRequest, captor.get());
-    }
-
-    private void assertEquivalence(Node expected, Object captured) {
-        switch (expected.getType()) {
-            case OBJECT -> {
-                Assertions.assertNotNull(captured);
-                if (captured instanceof Map capturedMap) {
-                    assertEquals(expected.expectObjectNode().size(), capturedMap.size());
-                    for (Map.Entry<StringNode, Node> entry : expected.expectObjectNode().getMembers().entrySet()) {
-                        assertEquivalence(entry.getValue(), capturedMap.get(entry.getKey().getValue()));
-                    }
-                } else {
-                    assertStructuralEquivalence(expected.expectObjectNode(), captured);
-                }
-            }
-            case ARRAY -> {
-                Assertions.assertNotNull(captured);
-                Collection list;
-                if (Arrays.isArray(captured)) {
-                    list = Arrays.asList(captured);
-                } else {
-                    list = (Collection) captured;
-                }
-                List<Node> expectedElements = expected.expectArrayNode().getElements();
-                assertEquals(expectedElements.size(), list.size());
-                int i = 0;
-                for (Object capturedElement : list) {
-                    assertEquivalence(expectedElements.get(i++), capturedElement);
-                }
-            }
-            case STRING -> {
-                Assertions.assertNotNull(captured);
-                String expectedString = expected.expectStringNode().getValue();
-                if (captured instanceof String) {
-                    assertEquals(expectedString, captured);
-                } else if (captured instanceof byte[]) {
-                    assertArrayEquals(expectedString.getBytes(Charsets.UTF_8), (byte[]) captured);
-                } else {
-                    try {
-                        Method valueMethod = captured.getClass().getDeclaredMethod("value");
-                        assertEquals(expectedString, valueMethod.invoke(captured));
-                        return;
-                    } catch (InvocationTargetException | NoSuchMethodException | IllegalAccessException ignore) {}
-                    Assertions.fail("Unexpected captured type: " + captured.getClass());
-                }
-            }
-            case NUMBER -> {
-                Assertions.assertNotNull(captured);
-                if (captured instanceof Number capturedNum) {
-                    Number expectedNum = expected.expectNumberNode().getValue();
-                    if (expectedNum instanceof Long) {
-                        assertEquals(expectedNum, capturedNum.longValue());
-                    } else if (expectedNum instanceof Integer) {
-                        assertEquals(expectedNum, capturedNum.intValue());
-                    } else if (expectedNum instanceof Float) {
-                        assertEquals(expectedNum, capturedNum.floatValue());
-                    } else if (expectedNum instanceof Double) {
-                        assertEquals(expectedNum, capturedNum.doubleValue());
-                    } else {
-                        assertEquals(expectedNum, capturedNum);
-                    }
-                } else if (captured instanceof Instant) {
-                    assertEquals(Instant.ofEpochSecond(expected.expectNumberNode().getValue().longValue()), captured);
-                } else {
-                    try {
-                        Method valueMethod = captured.getClass().getDeclaredMethod("value");
-                        assertEquals(expected.expectNumberNode().getValue().intValue(), valueMethod.invoke(captured));
-                        return;
-                    } catch (InvocationTargetException | NoSuchMethodException | IllegalAccessException ignore) {}
-                    Assertions.fail("Unexpected captured type: " + captured.getClass());
-                }
-            }
-            case BOOLEAN -> {
-                Assertions.assertNotNull(captured);
-                assertEquals(expected.expectBooleanNode().getValue(), captured);
-            }
-            case NULL -> {
-                assertNull(captured);
-            }
-        }
-    }
-
-    private void assertStructuralEquivalence(ObjectNode deserializedRequest, Object capturedRequest) {
-        for (Map.Entry<StringNode, Node> member : deserializedRequest.getMembers().entrySet()) {
-            try {
-                Method getter = capturedRequest.getClass().getDeclaredMethod(member.getKey().getValue());
-                assertEquivalence(member.getValue(), getter.invoke(capturedRequest));
-            } catch (NoSuchMethodException e) {
-                Assertions.fail(
-                    "Payload contained member " + member.getKey().getValue() +
-                        ", but input type " + capturedRequest.getClass() + " did not."
-                );
-                return;
-            } catch (InvocationTargetException | IllegalAccessException e) {
-                Assertions.fail("Failed to get member from captured request", e);
-                return;
-            }
-        }
+        assertEquals(deserializedRequest, captor.get());
     }
 
     private TestClient getClient(URI endpoint) {
@@ -353,7 +280,15 @@ public class EndToEndProtocolTests {
                 for (TestOperation to : ts.operations()) {
                     for (HttpRequestTestCase tc : to.requestTestCases()) {
                         if (ONLY_RUN_THESE_TESTS.isEmpty() || ONLY_RUN_THESE_TESTS.contains(tc.getId())) {
-                            contexts.add(new RequestTestInvocationContext(endpoint, tc, to.mock()));
+                            contexts.add(
+                                new RequestTestInvocationContext(
+                                    endpoint,
+                                    tc,
+                                    to.mock(),
+                                    to.builderSupplier(),
+                                    MANUAL_EXPECTATIONS.get(tc.getId())
+                                )
+                            );
                         }
                     }
                 }
