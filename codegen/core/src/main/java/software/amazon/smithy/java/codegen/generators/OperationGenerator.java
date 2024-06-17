@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.codegen.generators;
 
+import java.util.Map;
 import java.util.function.Consumer;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
@@ -15,6 +16,7 @@ import software.amazon.smithy.java.codegen.sections.ClassSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.InputEventStreamingSdkOperation;
+import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.OutputEventStreamingSdkOperation;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
@@ -59,6 +61,9 @@ public class OperationGenerator
                 writer.putContext("sdkSchema", Schema.class);
                 writer.putContext("sdkShapeBuilder", ShapeBuilder.class);
                 writer.putContext("typeRegistry", TypeRegistry.class);
+                writer.putContext("modeledApiException", ModeledApiException.class);
+                writer.putContext("map", Map.class);
+                writer.putContext("class", Class.class);
 
                 writer.putContext(
                     "operationType",
@@ -76,6 +81,18 @@ public class OperationGenerator
                     new SchemaGenerator(
                         writer,
                         shape,
+                        directive.symbolProvider(),
+                        directive.model(),
+                        directive.context()
+                    )
+                );
+
+                writer.putContext(
+                    "exceptionSchemas",
+                    new ModeledExceptionsGenerator(
+                        writer,
+                        shape,
+                        directive.service(),
                         directive.symbolProvider(),
                         directive.model(),
                         directive.context()
@@ -119,6 +136,8 @@ public class OperationGenerator
                         public final class ${shape:T} implements ${operationType:C} {
 
                             static final ${sdkSchema:T} SCHEMA = ${schema:C}
+
+                            static final ${map:T}<${class:T}<? extends ${modeledApiException:T}>, ${sdkSchema:T}> EXCEPTION_SCHEMAS = ${exceptionSchemas:C}
 
                             ${typeRegistrySection:C|}
 
@@ -164,6 +183,11 @@ public class OperationGenerator
                             @Override
                             public ${typeRegistry:T} typeRegistry() {
                                 return typeRegistry;
+                            }
+
+                            @Override
+                            public ${sdkSchema:T} exceptionSchema(${modeledApiException:T} exception) {
+                                return EXCEPTION_SCHEMAS.get(exception.getClass());
                             }
                         }
                         """
@@ -284,6 +308,27 @@ public class OperationGenerator
                     }
                     """, ShapeBuilder.class, symbolProvider.toSymbol(info.getEventStreamTarget()), Schema.class);
             });
+        }
+    }
+
+    private record ModeledExceptionsGenerator(
+        JavaWriter writer, OperationShape shape, ServiceShape service, SymbolProvider symbolProvider,
+        Model model, CodeGenerationContext context
+    ) implements Runnable {
+        @Override
+        public void run() {
+            var errors = shape.getErrors(service)
+                .stream()
+                .map(model::expectShape)
+                .map(symbolProvider::toSymbol)
+                .toList();
+            writer.pushState();
+            writer.putContext("errors", errors);
+            writer.write(
+                "${map:T}.ofEntries(${#errors}${map:T}.entry(${value:T}.class, ${value:T}.SCHEMA)${^key.last}, ${/key.last}${/errors});"
+            );
+            writer.popState();
+
         }
     }
 }

@@ -17,7 +17,6 @@ import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpHeaders.Names;
 import io.netty.handler.codec.http.HttpMessage;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
@@ -29,10 +28,7 @@ import java.net.URI;
 import java.net.http.HttpHeaders;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicReference;
@@ -212,12 +208,13 @@ final class NettyHandler extends ChannelDuplexHandler {
                     HttpResponse response;
                     if (job.reply().getValue() instanceof ByteValue byteValue) {
                         ByteBuf content = Unpooled.wrappedBuffer(byteValue.get());
+                        Integer statusCode = job.reply().context().get(HttpAttributes.STATUS_CODE, 200);
                         response = new DefaultFullHttpResponse(
                             HttpVersion.HTTP_1_1,
-                            HttpResponseStatus.OK,
+                            HttpResponseStatus.valueOf(statusCode),
                             content
                         );
-                        response.headers().add(Names.CONTENT_LENGTH, content.readableBytes());
+                        response.headers().add(HttpHeaderNames.CONTENT_LENGTH, content.readableBytes());
                     } else {
                         response = new DefaultHttpResponse(
                             HttpVersion.HTTP_1_1,
@@ -282,7 +279,7 @@ final class NettyHandler extends ChannelDuplexHandler {
             HttpResponseStatus.INTERNAL_SERVER_ERROR,
             content
         );
-        response.headers().add(Names.CONTENT_LENGTH, content.readableBytes());
+        response.headers().add(HttpHeaderNames.CONTENT_LENGTH, content.readableBytes());
         channel.writeAndFlush(response);
 
         //TODO: figure out when it is safe to not close here

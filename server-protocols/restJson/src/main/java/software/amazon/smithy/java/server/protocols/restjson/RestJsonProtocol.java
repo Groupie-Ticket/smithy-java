@@ -6,11 +6,7 @@
 package software.amazon.smithy.java.server.protocols.restjson;
 
 import java.util.concurrent.ExecutionException;
-import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
-import software.amazon.smithy.java.runtime.core.schema.InputEventStreamingSdkOperation;
-import software.amazon.smithy.java.runtime.core.schema.OutputEventStreamingSdkOperation;
-import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
-import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
+import software.amazon.smithy.java.runtime.core.schema.*;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.EventStreamFrameEncodingProcessor;
@@ -33,6 +29,7 @@ import software.amazon.smithy.java.server.core.ServerProtocol;
 import software.amazon.smithy.java.server.core.ShapeValue;
 import software.amazon.smithy.java.server.core.Value;
 import software.amazon.smithy.java.server.core.attributes.HttpAttributes;
+import software.amazon.smithy.java.server.exceptions.InternalServerException;
 import software.amazon.smithy.model.pattern.UriPattern;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.HttpTrait;
@@ -119,19 +116,33 @@ final class RestJsonProtocol extends ServerProtocol {
 
     @Override
     public void serializeOutput(Job job) {
-        ApiOperation<?, ?> sdkOperation = job.operation().getApiOperation();
+        ApiOperation<?, ?> apiOperation = job.operation().getApiOperation();
         ShapeValue<? extends SerializableStruct> shapeValue = job.reply().getValue();
+        Schema schema;
+        SerializableStruct value = shapeValue.get();
+        if (value instanceof Exception e) {
+            if (e instanceof ModeledApiException me) {
+                schema = apiOperation.exceptionSchema(me);
+            } else {
+                value = new InternalServerException(e);
+                schema = InternalServerException.SCHEMA;
+            }
+        } else {
+            schema = apiOperation.outputSchema();
+        }
         HttpBindingSerializer serializer = new HttpBindingSerializer(
-            null,
+            schema.getTrait(HttpTrait.class),
             codec,
             BindingMatcher.responseMatcher(),
             null
         );
-        serializer.writeStruct(sdkOperation.outputSchema(), shapeValue.get());
+        serializer.writeStruct(schema, value);
         serializer.flush();
+        int responseStatus = serializer.getResponseStatus();
         job.reply().context().put(HttpAttributes.HTTP_HEADERS, serializer.getHeaders());
+        job.reply().context().put(HttpAttributes.STATUS_CODE, responseStatus > 0 ? responseStatus : 200);
 
-        if (sdkOperation instanceof OutputEventStreamingSdkOperation<?, ?, ?> outputStreamingOp) {
+        if (apiOperation instanceof OutputEventStreamingSdkOperation<?, ?, ?> outputStreamingOp) {
             EventStreamFrameEncodingProcessor<AwsFlowFrame, ?> stream = new EventStreamFrameEncodingProcessor<>(
                 serializer.getEventStream(),
                 new AwsFlowShapeEncoder<>(
@@ -141,7 +152,7 @@ final class RestJsonProtocol extends ServerProtocol {
                 new AwsFlowFrameEncoder()
             );
             job.reply().setValue(new ReactiveByteValue(stream));
-        } else if (sdkOperation.streamingOutput()) {
+        } else if (apiOperation.streamingOutput()) {
             job.reply().setValue(new ReactiveByteValue(serializer.getBody()));
         } else {
             DataStream dataStream = serializer.getBody();

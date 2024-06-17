@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.server.core;
 
 import java.util.List;
-import software.amazon.smithy.java.runtime.core.Context;
 import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -20,8 +19,6 @@ public abstract class ServerProtocol {
         this.service = service;
         this.operations = List.copyOf(service.getAllOperations());
     }
-
-    public static Context.Key<ServerProtocol> SERVER_PROTOCOL = Context.key("server-protocol");
 
 
     public abstract ShapeId getProtocolId();

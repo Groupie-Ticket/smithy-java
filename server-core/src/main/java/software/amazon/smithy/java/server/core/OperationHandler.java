@@ -6,9 +6,11 @@
 package software.amazon.smithy.java.server.core;
 
 import java.util.concurrent.CompletableFuture;
+import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.Service;
+import software.amazon.smithy.java.server.exceptions.InternalServerException;
 
 
 public class OperationHandler implements Handler {
@@ -28,13 +30,31 @@ public class OperationHandler implements Handler {
         if (operation.isAsync()) {
             CompletableFuture<? extends SerializableStruct> response = (CompletableFuture<? extends SerializableStruct>) operation
                 .asyncFunction()
-                .apply(input, null);
+                .apply(input, job.request().userContext());
             response.whenComplete((result, error) -> {
-                job.reply().setValue(new ShapeValue<>(result));
+                SerializableStruct output;
+                if (error != null) {
+                    if (error instanceof ModeledApiException e) {
+                        output = e;
+                    } else {
+                        output = new InternalServerException(error);
+                    }
+                } else {
+                    output = result;
+                }
+                job.reply().setValue(new ShapeValue<>(output));
                 cf.complete(null);
             });
         } else {
-            SerializableStruct output = (SerializableStruct) operation.function().apply(input, null);
+            SerializableStruct output;
+            try {
+                output = (SerializableStruct) operation.function()
+                    .apply(input, job.request().userContext());
+            } catch (ModeledApiException exception) {
+                output = exception;
+            } catch (Throwable throwable) {
+                output = new InternalServerException(throwable);
+            }
             job.reply().setValue(new ShapeValue<>(output));
             cf.complete(null);
         }

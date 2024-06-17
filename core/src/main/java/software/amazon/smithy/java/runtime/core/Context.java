@@ -123,6 +123,15 @@ public interface Context {
     <T> T get(Key<T> key);
 
     /**
+     * Get a property.
+     *
+     * @param key Property key to get by exact reference identity.
+     * @return    the value, or null if not present.
+     * @param <T> Value type.
+     */
+    <T> T get(Key<T> key, T defaultValue);
+
+    /**
      * Get a property and throw if it isn't present.
      *
      * @param key Property key to get by exact reference identity.
@@ -187,6 +196,15 @@ public interface Context {
             @SuppressWarnings("unchecked")
             public <T> T get(Key<T> key) {
                 return (T) attributes.get(key);
+            }
+
+            @Override
+            public <T> T get(Key<T> key, T defaultValue) {
+                T value = (T) attributes.get(key);
+                if (value != null) {
+                    return value;
+                }
+                return defaultValue;
             }
 
             @Override

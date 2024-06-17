@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.runtime.core.schema;
 
+
 /**
  * Represents a modeled Smithy operation.
  *
@@ -63,4 +64,6 @@ public interface ApiOperation<I extends SerializableStruct, O extends Serializab
      * @return Returns the type registry.
      */
     TypeRegistry typeRegistry();
+
+    Schema exceptionSchema(ModeledApiException exception);
 }

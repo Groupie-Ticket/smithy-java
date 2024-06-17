@@ -37,6 +37,7 @@ operation GetBeer {
         @idx(2)
         beerId: Long
     }
+    errors: [NoSuchBeerException, DependencyException]
 }
 
 @http(method: "POST", uri: "/echo")
@@ -150,6 +151,20 @@ structure Beer {
 
 list BeerList {
     member: Beer
+}
+
+@error("client")
+@httpError(404)
+structure NoSuchBeerException {
+    @idx(1)
+    message: String
+}
+
+@error("server")
+@httpError(500)
+structure DependencyException {
+    @idx(1)
+    message: String
 }
 
 

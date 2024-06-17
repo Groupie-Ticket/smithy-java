@@ -21,7 +21,7 @@ public final class ProtocolResolver {
 
     private final static Map<ShapeId, ServerProtocolProvider> SERVER_PROTOCOL_HANDLERS = ServiceLoader.load(
         ServerProtocolProvider.class,
-        ServerProtocolsIndex.class.getClassLoader()
+        ProtocolResolver.class.getClassLoader()
     )
         .stream()
         .map(ServiceLoader.Provider::get)
