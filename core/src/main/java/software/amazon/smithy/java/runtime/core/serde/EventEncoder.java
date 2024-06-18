@@ -11,4 +11,6 @@ public interface EventEncoder<T extends SerializableStruct, F extends Frame<?>> 
 
     F encode(T item);
 
+    F encodeFailure(Throwable exception);
+
 }
