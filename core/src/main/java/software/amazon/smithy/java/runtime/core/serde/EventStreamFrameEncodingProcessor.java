@@ -165,7 +165,8 @@ public final class EventStreamFrameEncodingProcessor<F extends Frame<?>, T exten
             if (term == COMPLETE) {
                 subscriber.onComplete();
             } else {
-                subscriber.onError(term);
+                subscriber.onNext(encoder.encode(eventEncoder.encodeFailure(term)));
+                subscriber.onComplete();
             }
             return true;
         }
