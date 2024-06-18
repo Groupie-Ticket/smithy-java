@@ -5,18 +5,24 @@
 
 package software.amazon.smithy.protocol.traits;
 
-import static java.util.stream.Collectors.toSet;
-
-import java.util.*;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.neighbor.Walker;
-import software.amazon.smithy.model.shapes.*;
+import software.amazon.smithy.model.shapes.MemberShape;
+import software.amazon.smithy.model.shapes.ServiceShape;
+import software.amazon.smithy.model.shapes.Shape;
+import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.EventHeaderTrait;
 import software.amazon.smithy.model.traits.EventPayloadTrait;
 import software.amazon.smithy.model.traits.MixinTrait;
 import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.model.validation.AbstractValidator;
 import software.amazon.smithy.model.validation.ValidationEvent;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * A validator for indexed services. If a shape is in the closure of an indexed service,
@@ -39,16 +45,8 @@ public final class IndexedServiceTraitValidator extends AbstractValidator {
             });
         }
 
-        Map<ShapeId, Set<String>> inheritedMembers = new HashMap<>();
-        for (StructureShape parent : model.getStructureShapesWithTrait(HierarchicalIdxTrait.class)) {
-            Set<String> parentDeclared = parent.members().stream().map(MemberShape::getMemberName).collect(toSet());
-            for (String child : parent.expectTrait(HierarchicalIdxTrait.class).getValues()) {
-                inheritedMembers.put(ShapeId.from(child), parentDeclared);
-            }
-        }
-
         for (ShapeId shapeId : shapesOfInterest) {
-            validateMembers(model, model.expectShape(shapeId), inheritedMembers, events);
+            validateMembers(model, model.expectShape(shapeId), events);
         }
 
         return events;
@@ -57,20 +55,10 @@ public final class IndexedServiceTraitValidator extends AbstractValidator {
     private void validateMembers(
         Model model,
         Shape container,
-        Map<ShapeId, Set<String>> inheritedMembers,
         List<ValidationEvent> events
     ) {
         int lastIdx = 0;
         List<MemberShape> sorted = new ArrayList<>(container.members());
-
-        Set<String> parentMembers = inheritedMembers.getOrDefault(container.getId(), Collections.emptySet());
-        for (Iterator<MemberShape> iter = sorted.iterator(); iter.hasNext();) {
-            MemberShape ms = iter.next();
-            if (parentMembers.contains(ms.getMemberName())) {
-                iter.remove();
-            }
-        }
-
         sorted.sort(Comparator.comparingInt(t -> t.getTrait(IdxTrait.class).map(IdxTrait::getValue).orElse(-1)));
 
         for (MemberShape ms : sorted) {
