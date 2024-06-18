@@ -1,3 +1,2 @@
-software.amazon.smithy.protocol.traits.HierarchicalIdxTraitValidator
 software.amazon.smithy.protocol.traits.IndexedServiceTraitValidator
 software.amazon.smithy.protocol.traits.Rpcv2KestrelTraitValidator
