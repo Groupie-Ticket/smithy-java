@@ -33,7 +33,6 @@ import software.amazon.smithy.java.server.core.ServerProtocol;
 import software.amazon.smithy.java.server.core.ShapeValue;
 import software.amazon.smithy.java.server.core.Value;
 import software.amazon.smithy.java.server.core.attributes.HttpAttributes;
-import software.amazon.smithy.java.server.exceptions.ExceptionWrapper;
 import software.amazon.smithy.java.server.exceptions.InternalServerException;
 import software.amazon.smithy.model.pattern.UriPattern;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -131,10 +130,9 @@ public final class RestJsonProtocol extends ServerProtocol {
             if (e instanceof ModeledApiException me) {
                 schema = apiOperation.exceptionSchema(me);
                 errorTrait = schema.expectTrait(HttpErrorTrait.class);
-                value = new ExceptionWrapper(me, schema);
             } else {
                 schema = InternalServerException.SCHEMA;
-                value = new ExceptionWrapper(new InternalServerException(e), schema);
+                value = new InternalServerException(e);
                 errorTrait = schema.expectTrait(HttpErrorTrait.class);
             }
         } else {

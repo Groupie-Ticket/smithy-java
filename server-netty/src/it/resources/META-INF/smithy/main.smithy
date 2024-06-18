@@ -28,7 +28,6 @@ operation GetBeer {
     }
     output:= {
         @required
-        @httpPayload
         @idx(1)
         value: Beer
 
