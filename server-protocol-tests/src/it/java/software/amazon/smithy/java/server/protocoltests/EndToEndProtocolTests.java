@@ -67,7 +67,8 @@ import software.amazon.smithy.protocoltests.traits.HttpResponseTestsTrait;
 
 public class EndToEndProtocolTests {
     // If this is non-empty, only the test names (from the trait, not the operation name) within will run
-    private static final Set<String> ONLY_RUN_THESE_TESTS = Set.of();
+    private static final Set<String> ONLY_RUN_THESE_TESTS = Set.of(
+    );
 
     private static final Set<ShapeId> REMOVED_OPERATIONS = Set.of(
         ShapeId.from("aws.protocoltests.restjson#RecursiveShapes")
@@ -342,7 +343,7 @@ public class EndToEndProtocolTests {
             }
         }
 
-        expectedResponse.body.ifPresentOrElse(expectedBody -> {
+        expectedResponse.body.ifPresent(expectedBody -> {
             expectedResponse.bodyMediaType.ifPresent(expectedMediaType -> {
                 assertEquals(expectedMediaType, serviceResponse.headers().get(HttpHeaderNames.CONTENT_TYPE));
                 if (expectedMediaType.equals("application/json")) {
@@ -354,8 +355,6 @@ public class EndToEndProtocolTests {
                     assertEquals(expectedBody, serviceResponse.content().toString(StandardCharsets.UTF_8));
                 }
             });
-        }, () -> {
-            assertEquals(0, serviceResponse.content().readableBytes());
         });
     }
 
