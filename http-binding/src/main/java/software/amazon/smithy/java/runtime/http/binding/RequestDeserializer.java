@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.runtime.http.binding;
 
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
@@ -17,7 +18,7 @@ import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
  */
 public final class RequestDeserializer {
 
-    private final HttpBindingDeserializer.Builder deserBuilder = HttpBindingDeserializer.builder();
+    private final HttpBindingDeserializer.Builder deserBuilder = HttpBindingDeserializer.builder().request(true);
     private ShapeBuilder<?> inputShapeBuilder;
     private ShapeBuilder<? extends ModeledApiException> errorShapeBuilder;
 
@@ -63,6 +64,11 @@ public final class RequestDeserializer {
     public RequestDeserializer inputShapeBuilder(ShapeBuilder<?> inputShapeBuilder) {
         this.inputShapeBuilder = inputShapeBuilder;
         errorShapeBuilder = null;
+        return this;
+    }
+
+    public RequestDeserializer pathLabelValues(Map<String, String> labelValues) {
+        deserBuilder.requestPathLabels(labelValues);
         return this;
     }
 

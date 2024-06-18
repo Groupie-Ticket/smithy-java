@@ -5,13 +5,21 @@
 
 package software.amazon.smithy.java.server.protocols.restjson;
 
+import static software.amazon.smithy.java.server.protocols.restjson.router.UriPattern.forSpecificityRouting;
+
 import java.net.http.HttpHeaders;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import software.amazon.smithy.java.runtime.core.schema.*;
+import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
+import software.amazon.smithy.java.runtime.core.schema.InputEventStreamingSdkOperation;
+import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
+import software.amazon.smithy.java.runtime.core.schema.OutputEventStreamingSdkOperation;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.EventStreamFrameEncodingProcessor;
@@ -35,16 +43,36 @@ import software.amazon.smithy.java.server.core.ShapeValue;
 import software.amazon.smithy.java.server.core.Value;
 import software.amazon.smithy.java.server.core.attributes.HttpAttributes;
 import software.amazon.smithy.java.server.exceptions.InternalServerException;
-import software.amazon.smithy.model.pattern.UriPattern;
+import software.amazon.smithy.java.server.protocols.restjson.router.UriMatcherMap;
+import software.amazon.smithy.java.server.protocols.restjson.router.UriTreeMatcherMap;
+import software.amazon.smithy.java.server.protocols.restjson.router.UrlEncoder;
+import software.amazon.smithy.java.server.protocols.restjson.router.ValuedMatch;
+import software.amazon.smithy.model.pattern.SmithyPattern;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.HttpErrorTrait;
 import software.amazon.smithy.model.traits.HttpTrait;
 
 public final class RestJsonProtocol extends ServerProtocol {
+
+    private final UriMatcherMap<Operation<?, ?>> matcher;
     private final Codec codec;
 
     public RestJsonProtocol(final Service service) {
         super(service);
+        var builder = UriTreeMatcherMap.<Operation<?, ?>>builder();
+        for (Operation<?, ?> operation : getOperations()) {
+            builder.add(
+                forSpecificityRouting(
+                    operation.getApiOperation()
+                        .schema()
+                        .expectTrait(HttpTrait.class)
+                        .getUri()
+                        .toString()
+                ),
+                operation
+            );
+        }
+        matcher = builder.build();
         this.codec = JsonCodec.builder().useJsonName(true).useTimestampFormat(true).build();
     }
 
@@ -55,25 +83,45 @@ public final class RestJsonProtocol extends ServerProtocol {
 
     @Override
     public Operation<?, ?> resolveOperation(ResolutionRequest request) {
-        String path = request.uri().getPath();
-        UriPattern uri = UriPattern.parse(path);
-        Operation<?, ?> selectedOperation = null;
-        for (Operation<?, ?> operation : getOperations()) {
-            UriPattern uriPattern = operation.getApiOperation().schema().expectTrait(HttpTrait.class).getUri();
-            if (uriPattern.equals(uri)) {
-                selectedOperation = operation;
-                break;
-            }
+        ValuedMatch<Operation<?, ?>> selectedOperation = matcher.match(request.uri().getPath());
+        if (selectedOperation != null) {
+            return selectedOperation.getValue();
         }
-        return selectedOperation;
+
+        return null;
     }
 
     @Override
     public CompletableFuture<Void> deserializeInput(Job job) {
 
         ShapeBuilder<? extends SerializableStruct> shapeBuilder = job.operation().getApiOperation().inputBuilder();
+
+        // todo - store the path match result
+        ValuedMatch<Operation<?, ?>> selectedOperation = matcher.match(
+            job.request().getContext().get(HttpAttributes.HTTP_URI).getPath()
+        );
+
+        if (selectedOperation.getValue() != job.operation()) {
+            throw new IllegalStateException();
+        }
+
+        Map<String, String> labelValues = new HashMap<>();
+        var encoder = new UrlEncoder();
+        for (SmithyPattern.Segment label : job.operation()
+            .getApiOperation()
+            .schema()
+            .expectTrait(HttpTrait.class)
+            .getUri()
+            .getLabels()) {
+            var values = selectedOperation.getLabelValues(label.getContent());
+            if (values != null) {
+                labelValues.put(label.getContent(), encoder.decodeUriComponent(values.get(0)));
+            }
+        }
+
         var deser = HttpBinding.requestDeserializer()
             .inputShapeBuilder(shapeBuilder)
+            .pathLabelValues(labelValues)
             .request(
                 SmithyHttpRequest.builder()
                     .headers(job.request().getContext().get(HttpAttributes.HTTP_HEADERS))
