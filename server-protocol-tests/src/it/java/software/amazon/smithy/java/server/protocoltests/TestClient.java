@@ -28,6 +28,11 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
@@ -91,10 +96,83 @@ final class TestClient {
                     req.headers().add(HttpHeaderNames.CONTENT_TYPE, mt);
                 });
             }
+            for (Map.Entry<String, String> header : request.headers().entrySet()) {
+                if (header.getKey().toLowerCase(Locale.US).startsWith("x-")) {
+                    req.headers().set(header.getKey(), parseHeaderValue(header.getValue()));
+                } else {
+                    req.headers().set(header.getKey(), header.getValue());
+                }
+            }
             return call(req);
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
         }
+    }
+
+
+    static List<String> parseHeaderValue(String value) {
+        var retVal = new ArrayList<String>();
+        StringBuilder buffer = new StringBuilder();
+        boolean inQuotes = false;
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (isHeaderDelimiter(c)) {
+                if (c == '"') {
+                    if (inQuotes) {
+                        retVal.add(buffer.toString().trim());
+                        buffer = new StringBuilder();
+                    }
+                    inQuotes = !inQuotes;
+                    continue;
+                }
+
+                if (c == '\\' && inQuotes && i + 1 < value.length()) {
+                    buffer.append(value.charAt(++i));
+                    continue;
+                }
+
+                if (inQuotes) {
+                    buffer.append(c);
+                    continue;
+                }
+
+                var next = buffer.toString().trim();
+                if (!next.isEmpty()) {
+                    retVal.add(next);
+                }
+                buffer = new StringBuilder();
+            } else {
+                buffer.append(c);
+            }
+        }
+        if (!buffer.isEmpty()) {
+            retVal.add(buffer.toString().trim());
+        }
+        return retVal;
+    }
+
+    private static final Set<Character> HEADER_DELIMS = Set.of(
+        '"',
+        '(',
+        ')',
+        ',',
+        '/',
+        ':',
+        ';',
+        '<',
+        '=',
+        '>',
+        '?',
+        '@',
+        '[',
+        '\\',
+        ']',
+        '{',
+        '}'
+    );
+
+    static boolean isHeaderDelimiter(char c) {
+        return HEADER_DELIMS.contains(c);
     }
 
     FullHttpResponse call(FullHttpRequest request) {
@@ -104,7 +182,7 @@ final class TestClient {
 
             @Override
             protected void channelRead0(ChannelHandlerContext ctx, FullHttpResponse msg) throws Exception {
-                cf.complete(msg.duplicate());
+                cf.complete(msg.retain());
             }
 
             @Override

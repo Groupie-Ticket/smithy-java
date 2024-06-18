@@ -12,7 +12,6 @@ import aws.protocoltests.restjson.model.TestPayloadStructureInput;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
-import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpVersion;
@@ -26,8 +25,8 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -35,6 +34,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -54,6 +54,7 @@ import software.amazon.smithy.java.server.Server;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.java.server.netty.NettyServerBuilder;
 import software.amazon.smithy.model.Model;
+import software.amazon.smithy.model.node.ObjectNode;
 import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -316,40 +317,53 @@ public class EndToEndProtocolTests {
     ) {
         mock.setResponse(deserializedResponse);
         var c = getClient(endpoint);
-        assertEquals(
-            rawResponse,
-            convertResponse(
-                c.call(getTestRequest(endpoint, serviceCoordinate.serviceId(), serviceCoordinate.operationId()))
-            )
+        var serviceResponse = c.call(
+            getTestRequest(endpoint, serviceCoordinate.serviceId(), serviceCoordinate.operationId())
         );
+
+        assertEquals(rawResponse.code, serviceResponse.status().code());
+
+        for (var headerEntry : rawResponse.headers.entrySet()) {
+            if (headerEntry.getKey().toLowerCase(Locale.US).startsWith("x-")) {
+                assertEquals(
+                    headerEntry.getValue(),
+                    convertResponseHeader(serviceResponse.headers().getAll(headerEntry.getKey())),
+                    "Mismatch for expected header: " + headerEntry.getKey()
+                );
+            } else {
+                assertEquals(
+                    headerEntry.getValue(),
+                    serviceResponse.headers().get(headerEntry.getKey()),
+                    "Mismatch for expected header " + headerEntry.getKey()
+                );
+            }
+        }
+
+        rawResponse.body.ifPresentOrElse(expectedBody -> {
+            rawResponse.bodyMediaType.ifPresent(expectedMediaType -> {
+                assertEquals(expectedMediaType, serviceResponse.headers().get(HttpHeaderNames.CONTENT_TYPE));
+                if (expectedMediaType.equals("application/json")) {
+                    assertEquals(
+                        ObjectNode.parse(expectedBody),
+                        ObjectNode.parse(serviceResponse.content().toString(StandardCharsets.UTF_8))
+                    );
+                } else {
+                    assertEquals(expectedBody, serviceResponse.content().toString(StandardCharsets.UTF_8));
+                }
+            });
+        }, () -> {
+            assertEquals(0, serviceResponse.content().readableBytes());
+        });
     }
 
-    private HttpResponse convertResponse(FullHttpResponse response) {
-        var headersMap = new HashMap<String, String>();
-        response.headers().forEach(e -> {
-            headersMap.compute(e.getKey(), (k, oldV) -> {
-                if (oldV == null) {
-                    return e.getValue();
-                }
-                return oldV + ", " + e.getValue();
-            });
-        });
-        if ("0".equals(headersMap.get("content-length"))) {
-            headersMap.remove("content-length");
-        }
-
-        Optional<String> body;
-        if (response.content().readableBytes() == 0) {
-            body = Optional.empty();
-        } else {
-            body = Optional.of(response.content().toString(StandardCharsets.UTF_8));
-        }
-        return new HttpResponse(
-            response.status().code(),
-            headersMap,
-            body,
-            Optional.ofNullable(response.headers().get(HttpHeaderNames.CONTENT_TYPE))
-        );
+    private String convertResponseHeader(List<String> values) {
+        return values.stream().map(value -> {
+            if (value.chars()
+                .anyMatch(c -> TestClient.isHeaderDelimiter((char) c) || Character.isWhitespace((char) c))) {
+                return '"' + value.replaceAll("[\\s\"]", "\\\\$0") + '"';
+            }
+            return value;
+        }).collect(Collectors.joining(", "));
     }
 
     private DefaultFullHttpRequest getTestRequest(URI endpoint, ShapeId serviceId, ShapeId operationId) {

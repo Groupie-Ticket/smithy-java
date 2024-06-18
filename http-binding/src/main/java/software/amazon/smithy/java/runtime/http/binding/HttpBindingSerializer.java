@@ -88,25 +88,31 @@ public final class HttpBindingSerializer extends SpecificShapeSerializer impleme
         boolean foundBody = false;
         boolean foundPayload = false;
         for (var member : schema.members()) {
-            BindingMatcher.Binding bindingLoc = bindingMatcher.match(member);
-            if (bindingLoc == BindingMatcher.Binding.BODY) {
+            if (bodyBindingPredicate(member)) {
                 foundBody = true;
-                break;
             }
-            if (bindingLoc == BindingMatcher.Binding.PAYLOAD) {
+            if (payloadBindingPredicate(member)) {
                 foundPayload = true;
-                break;
             }
         }
 
         if (foundBody || !foundPayload) {
             shapeBodyOutput = new ByteArrayOutputStream();
-            shapeBodySerializer = payloadCodec.createSerializer(shapeBodyOutput);
-            struct.serializeMembers(new BindingSerializer(this, shapeBodySerializer));
+            shapeBodySerializer = payloadCodec.createSerializer(shapeBodyOutput);            // Serialize only the body members to the codec.
+            SerializableStruct.filteredMembers(schema, struct, this::bodyBindingPredicate)
+                .serialize(shapeBodySerializer);
             headers.put("Content-Type", List.of(payloadCodec.getMediaType()));
-        } else {
-            struct.serializeMembers(new BindingSerializer(this, null));
         }
+
+        struct.serializeMembers(new BindingSerializer(this));
+    }
+
+    private boolean bodyBindingPredicate(Schema member) {
+        return bindingMatcher.match(member) == BindingMatcher.Binding.BODY;
+    }
+
+    private boolean payloadBindingPredicate(Schema member) {
+        return bindingMatcher.match(member) == BindingMatcher.Binding.PAYLOAD;
     }
 
     @Override
@@ -212,13 +218,11 @@ public final class HttpBindingSerializer extends SpecificShapeSerializer impleme
 
     private static final class BindingSerializer extends InterceptingSerializer {
         private final HttpBindingSerializer serializer;
-        private final ShapeSerializer bodyStructSerializer;
         private ByteArrayOutputStream structureBytes;
         private ShapeSerializer structureSerializer;
 
-        private BindingSerializer(HttpBindingSerializer serializer, ShapeSerializer bodyStructSerializer) {
+        private BindingSerializer(HttpBindingSerializer serializer) {
             this.serializer = serializer;
-            this.bodyStructSerializer = bodyStructSerializer;
         }
 
         @Override
