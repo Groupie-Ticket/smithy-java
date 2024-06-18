@@ -76,9 +76,16 @@ public final class HttpBindingDeserializer extends SpecificShapeDeserializer imp
                 case LABEL -> throw new UnsupportedOperationException("httpLabel binding not supported yet");
                 case QUERY -> throw new UnsupportedOperationException("httpQuery binding not supported yet");
                 case HEADER -> {
-                    var headerValue = headers.firstValue(bindingMatcher.header()).orElse(null);
-                    if (headerValue != null) {
-                        structMemberConsumer.accept(state, member, new HttpHeaderDeserializer(headerValue));
+                    if (member.type() == ShapeType.LIST) {
+                        var allValues = headers.allValues(bindingMatcher.header());
+                        if (!allValues.isEmpty()) {
+                            structMemberConsumer.accept(state, member, new HttpHeaderListDeserializer(allValues));
+                        }
+                    } else {
+                        var headerValue = headers.firstValue(bindingMatcher.header()).orElse(null);
+                        if (headerValue != null) {
+                            structMemberConsumer.accept(state, member, new HttpHeaderDeserializer(headerValue));
+                        }
                     }
                 }
                 case BODY -> bodyMembers.add(member.memberName());
