@@ -40,7 +40,7 @@ public final class ProtocolResolver {
     public Pair<Operation<?, ?>, ServerProtocol> resolveOperation(ResolutionRequest request) {
         for (ServerProtocol serverProtocolHandler : serverProtocolHandlers) {
             var operation = serverProtocolHandler.resolveOperation(request);
-            if (serverProtocolHandler.resolveOperation(request) != null) {
+            if (operation != null) {
                 return Pair.of(operation, serverProtocolHandler);
             }
         }

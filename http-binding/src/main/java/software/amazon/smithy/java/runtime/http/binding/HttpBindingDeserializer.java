@@ -73,7 +73,11 @@ public final class HttpBindingDeserializer extends SpecificShapeDeserializer imp
         // First parse members in the framing.
         for (Schema member : schema.members()) {
             switch (bindingMatcher.match(member)) {
-                case LABEL -> throw new UnsupportedOperationException("httpLabel binding not supported yet");
+                case LABEL -> structMemberConsumer.accept(
+                    state,
+                    member,
+                    new HttpPathLabelDeserializer(requestPathLabels.get(member.memberName()))
+                );
                 case QUERY -> throw new UnsupportedOperationException("httpQuery binding not supported yet");
                 case HEADER -> {
                     if (member.type() == ShapeType.LIST) {
