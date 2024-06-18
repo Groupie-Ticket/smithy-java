@@ -311,7 +311,7 @@ public class EndToEndProtocolTests {
     void responseTest(
         URI endpoint,
         ServiceCoordinate serviceCoordinate,
-        HttpResponse rawResponse,
+        HttpResponse expectedResponse,
         SerializableShape deserializedResponse,
         MockOperation mock
     ) {
@@ -321,13 +321,16 @@ public class EndToEndProtocolTests {
             getTestRequest(endpoint, serviceCoordinate.serviceId(), serviceCoordinate.operationId())
         );
 
-        assertEquals(rawResponse.code, serviceResponse.status().code());
+        assertEquals(expectedResponse.code, serviceResponse.status().code());
 
-        for (var headerEntry : rawResponse.headers.entrySet()) {
+        for (var headerEntry : expectedResponse.headers.entrySet()) {
             if (headerEntry.getKey().toLowerCase(Locale.US).startsWith("x-")) {
                 assertEquals(
                     headerEntry.getValue(),
-                    convertResponseHeader(serviceResponse.headers().getAll(headerEntry.getKey())),
+                    convertResponseHeader(
+                        headerEntry.getKey(),
+                        serviceResponse.headers().getAll(headerEntry.getKey())
+                    ),
                     "Mismatch for expected header: " + headerEntry.getKey()
                 );
             } else {
@@ -339,8 +342,8 @@ public class EndToEndProtocolTests {
             }
         }
 
-        rawResponse.body.ifPresentOrElse(expectedBody -> {
-            rawResponse.bodyMediaType.ifPresent(expectedMediaType -> {
+        expectedResponse.body.ifPresentOrElse(expectedBody -> {
+            expectedResponse.bodyMediaType.ifPresent(expectedMediaType -> {
                 assertEquals(expectedMediaType, serviceResponse.headers().get(HttpHeaderNames.CONTENT_TYPE));
                 if (expectedMediaType.equals("application/json")) {
                     assertEquals(
@@ -356,7 +359,10 @@ public class EndToEndProtocolTests {
         });
     }
 
-    private String convertResponseHeader(List<String> values) {
+    private String convertResponseHeader(String key, List<String> values) {
+        if (!key.equalsIgnoreCase("x-stringlist")) {
+            return String.join(", ", values);
+        }
         return values.stream().map(value -> {
             if (value.chars()
                 .anyMatch(c -> TestClient.isHeaderDelimiter((char) c) || Character.isWhitespace((char) c))) {

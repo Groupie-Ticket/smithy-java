@@ -61,6 +61,25 @@ record ResponseTestInvocationContext(
             new ParameterResolver() {
                 @Override
                 public boolean supportsParameter(
+                    ParameterContext parameterContext,
+                    ExtensionContext extensionContext
+                ) throws ParameterResolutionException {
+                    return parameterContext.getParameter()
+                        .getType()
+                        .equals(String.class);
+                }
+
+                @Override
+                public Object resolveParameter(
+                    ParameterContext parameterContext,
+                    ExtensionContext extensionContext
+                ) throws ParameterResolutionException {
+                    return testCase.getId();
+                }
+            },
+            new ParameterResolver() {
+                @Override
+                public boolean supportsParameter(
                     ParameterContext paramCtx,
                     ExtensionContext extensionCtx
                 ) throws ParameterResolutionException {
