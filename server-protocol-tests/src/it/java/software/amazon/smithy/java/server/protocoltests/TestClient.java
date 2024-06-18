@@ -98,7 +98,7 @@ final class TestClient {
             }
             for (Map.Entry<String, String> header : request.headers().entrySet()) {
                 if (header.getKey().toLowerCase(Locale.US).startsWith("x-")) {
-                    req.headers().set(header.getKey(), parseHeaderValue(header.getValue()));
+                    req.headers().set(header.getKey(), parseHeaderValue(header.getKey(), header.getValue()));
                 } else {
                     req.headers().set(header.getKey(), header.getValue());
                 }
@@ -110,7 +110,21 @@ final class TestClient {
     }
 
 
-    static List<String> parseHeaderValue(String value) {
+    static List<String> parseHeaderValue(String key, String value) {
+        if (key.equalsIgnoreCase("x-timestamplist")
+            || key.equalsIgnoreCase("x-memberhttpdate")
+            || key.equalsIgnoreCase("x-defaultformat")
+            || key.equalsIgnoreCase("x-targethttpdate")) {
+            List<String> result = new ArrayList<>();
+            String[] split = value.split(", ");
+            for (int i = 0; i < split.length; i += 2) {
+                result.add(split[i] + ", " + split[i + 1]);
+            }
+            return result;
+        }
+        if (!key.equalsIgnoreCase("x-stringlist")) {
+            return List.of(value.split(", *"));
+        }
         var retVal = new ArrayList<String>();
         StringBuilder buffer = new StringBuilder();
         boolean inQuotes = false;
