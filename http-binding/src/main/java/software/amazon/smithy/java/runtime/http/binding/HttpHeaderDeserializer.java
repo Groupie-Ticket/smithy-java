@@ -14,6 +14,7 @@ import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
+import software.amazon.smithy.model.traits.MediaTypeTrait;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
 final class HttpHeaderDeserializer implements ShapeDeserializer {
@@ -87,6 +88,9 @@ final class HttpHeaderDeserializer implements ShapeDeserializer {
 
     @Override
     public String readString(Schema schema) {
+        if (schema.hasTrait(MediaTypeTrait.class)) {
+            return new String(Base64.getDecoder().decode(value), StandardCharsets.UTF_8);
+        }
         return value;
     }
 
