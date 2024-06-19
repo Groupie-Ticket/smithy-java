@@ -110,7 +110,29 @@ union FizzBuzzStream {
     @idx(2)
     buzz: BuzzEvent
     @idx(3)
-    fizzBuzzException: FizzBuzzException
+    negativeNumberException: NegativeNumberException
+    @idx(4)
+    internalException: InternalException
+    @idx(5)
+    malformedInputException: MalformedInputException
+}
+
+@error("client")
+structure NegativeNumberException {
+    @idx(1)
+    message: String
+}
+
+@error("server")
+structure InternalException {
+    @idx(1)
+    message: String
+}
+
+@error("client")
+structure MalformedInputException {
+    @idx(1)
+    message: String
 }
 
 structure FizzEvent {
