@@ -30,6 +30,7 @@ import smithy.java.codegen.server.test.model.GetBeerInput;
 import smithy.java.codegen.server.test.model.GetBeerOutput;
 import smithy.java.codegen.server.test.model.HashFileInput;
 import smithy.java.codegen.server.test.model.HashFileOutput;
+import smithy.java.codegen.server.test.model.NegativeNumberException;
 import smithy.java.codegen.server.test.model.NoSuchBeerException;
 import smithy.java.codegen.server.test.model.ValueStream;
 import smithy.java.codegen.server.test.model.ZipFileInput;
@@ -138,6 +139,10 @@ class NettyServerTest {
             @Override
             public void onNext(ValueStream item) {
                 long value = item.Value().value();
+                if (value < 0) {
+                    onError(NegativeNumberException.builder().message(Long.toString(value)).build());
+                    return;
+                }
                 if (value % 3 == 0) {
                     submit(FizzBuzzStream.builder().fizz(FizzEvent.builder().value(value).build()).build());
                 }

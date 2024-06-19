@@ -103,7 +103,8 @@ final class NettyHandler extends ChannelDuplexHandler {
 
             if (httpRequest instanceof FullHttpRequest) {
                 writeResponse(channel, orchestrator.enqueue(job));
-                reset();
+                reset(channel);
+                return;
             }
 
             // If we have an HttpRequest but not an FullHttpRequest
@@ -145,8 +146,7 @@ final class NettyHandler extends ChannelDuplexHandler {
                     writeResponse(channel, orchestrator.enqueue(job));
                 }
 
-                reset();
-                channel.config().setAutoRead(true);
+                reset(channel);
             }
         }
     }
@@ -267,11 +267,12 @@ final class NettyHandler extends ChannelDuplexHandler {
         }, channel.eventLoop());
     }
 
-    private void reset() {
+    private void reset(Channel channel) {
         operation = null;
         job = null;
         bodyPublisher = null;
         bodyAccumulator = null;
+        channel.config().setAutoRead(true);
     }
 
     private static void sendErrorResponse(Throwable throwable, Channel channel) {
