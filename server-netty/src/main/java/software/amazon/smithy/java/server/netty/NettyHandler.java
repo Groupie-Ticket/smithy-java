@@ -305,8 +305,10 @@ final class NettyHandler extends ChannelDuplexHandler {
             if (sent) {
                 return;
             }
-            subscriber.onNext(content.copy().nioBuffer());
+            byte[] bytes = new byte[content.readableBytes()];
+            content.readBytes(bytes);
             content.release();
+            subscriber.onNext(ByteBuffer.wrap(bytes));
             subscriber.onComplete();
             sent = true;
         }
