@@ -67,8 +67,7 @@ import software.amazon.smithy.protocoltests.traits.HttpResponseTestsTrait;
 
 public class EndToEndProtocolTests {
     // If this is non-empty, only the test names (from the trait, not the operation name) within will run
-    private static final Set<String> ONLY_RUN_THESE_TESTS = Set.of(
-    );
+    private static final Set<String> ONLY_RUN_THESE_TESTS = Set.of();
 
     private static final Set<ShapeId> REMOVED_OPERATIONS = Set.of(
         ShapeId.from("aws.protocoltests.restjson#RecursiveShapes")

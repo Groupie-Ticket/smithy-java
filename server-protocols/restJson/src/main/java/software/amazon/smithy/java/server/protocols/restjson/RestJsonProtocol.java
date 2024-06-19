@@ -127,8 +127,7 @@ public final class RestJsonProtocol extends ServerProtocol {
         SerializableStruct value = shapeValue.get();
         HttpErrorTrait errorTrait = null;
         if (value instanceof Exception e) {
-            if (e instanceof ModeledApiException me) {
-                schema = apiOperation.exceptionSchema(me);
+            if (e instanceof ModeledApiException me && (schema = apiOperation.exceptionSchema(me)) != null) {
                 errorTrait = schema.expectTrait(HttpErrorTrait.class);
             } else {
                 schema = InternalServerException.SCHEMA;

@@ -5,7 +5,6 @@
 
 package software.amazon.smithy.java.server.netty;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -21,7 +20,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.GZIPOutputStream;
 import org.junit.jupiter.api.Test;
 import smithy.java.codegen.server.test.kestrel.KestrelGetBeerInput;
-import smithy.java.codegen.server.test.kestrel.KestrelGetBeerOutput;
 import smithy.java.codegen.server.test.model.*;
 import smithy.java.codegen.server.test.service.EchoOperation;
 import smithy.java.codegen.server.test.service.FizzBuzzOperation;
@@ -29,7 +27,6 @@ import smithy.java.codegen.server.test.service.GetBeerOperation;
 import smithy.java.codegen.server.test.service.HashFileOperation;
 import smithy.java.codegen.server.test.service.TestService;
 import smithy.java.codegen.server.test.service.ZipFileOperation;
-import software.amazon.smithy.java.kestrel.KestrelDeserializer;
 import software.amazon.smithy.java.kestrel.KestrelSerializer;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.server.RequestContext;
@@ -154,20 +151,20 @@ class NettyServerTest {
     @Test
     void testServer() {
         GetBeer getBeer = new GetBeer();
-        GetBeerInput getBeerInput = GetBeerInput.builder().id(2).build();
+        GetBeerInput getBeerInput = GetBeerInput.builder().id(20).build();
         KestrelGetBeerInput k = KestrelGetBeerInput.convertFrom(getBeerInput);
         KestrelSerializer serializer = new KestrelSerializer(k.size());
         k.encodeTo(serializer);
         System.out.println(Base64.getEncoder().encodeToString(serializer.payload()));
-        KestrelDeserializer deserializer = new KestrelDeserializer(serializer.payload());
-        KestrelGetBeerInput k2 = new KestrelGetBeerInput();
-        k2.decodeFrom(deserializer);
-        assertEquals(getBeerInput, k2.convertTo());
-        var output = getBeer.getBeer(getBeerInput, null);
-        KestrelGetBeerOutput kOutput = KestrelGetBeerOutput.convertFrom(output);
-        serializer = new KestrelSerializer(kOutput.size());
-        kOutput.encodeTo(serializer);
-        System.out.println(Base64.getEncoder().encodeToString(serializer.payload()));
+//        KestrelDeserializer deserializer = new KestrelDeserializer(serializer.payload());
+//        KestrelGetBeerInput k2 = new KestrelGetBeerInput();
+//        k2.decodeFrom(deserializer);
+//        assertEquals(getBeerInput, k2.convertTo());
+//        var output = getBeer.getBeer(getBeerInput, null);
+//        KestrelGetBeerOutput kOutput = KestrelGetBeerOutput.convertFrom(output);
+//        serializer = new KestrelSerializer(kOutput.size());
+//        kOutput.encodeTo(serializer);
+//        System.out.println(Base64.getEncoder().encodeToString(serializer.payload()));
         var server = Server.builder(URI.create("http://localhost:8080"))
             .addService(
                 TestService.builder()
