@@ -55,7 +55,6 @@ public record ServiceSchemaGenerator(
         return shape.getAllTraits()
             .entrySet()
             .stream()
-            .peek(System.out::println)
             .filter(k -> anyInstanceOf(k.getValue(), classes))
             .map(Map.Entry::getKey)
             .map(ShapeId::toString)

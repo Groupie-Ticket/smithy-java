@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.server.core.http;
 
 import java.util.Locale;
+import java.util.Objects;
 
 public final class HttpMethod {
     public static final HttpMethod OPTIONS = new HttpMethod("OPTIONS");
@@ -37,6 +38,11 @@ public final class HttpMethod {
         }
 
         return false;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(name);
     }
 
     public static HttpMethod valueOf(String name) {

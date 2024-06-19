@@ -244,7 +244,6 @@ public final class StructureGenerator<T extends ShapeDirective<StructureShape, C
         protected Void getDefault(Shape shape) {
             // If the member is not required then prefer the boxed type
             writer.pushState(new GetterSection(member));
-            System.out.println(member.getMemberName() + " " + writer.getContext("isNullable", Boolean.class));
             writer.write(
                 """
                     public ${?isNullable}${member:B}${/isNullable}${^isNullable}${member:T}${/isNullable} ${memberName:L}() {
