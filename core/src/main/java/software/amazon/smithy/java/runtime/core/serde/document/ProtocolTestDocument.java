@@ -316,5 +316,10 @@ public final class ProtocolTestDocument implements Document {
                 }
             }
         }
+
+        @Override
+        public boolean isNull() {
+            return jsonDocument.node.isNullNode();
+        }
     }
 }
