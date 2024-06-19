@@ -37,12 +37,12 @@ public class DefaultOrchestratorImpl implements Orchestrator {
     }
 
     private static List<Handler> assembleHandlers(Service service, List<Handler> endpointHandlers) {
-        List<Handler> handlers = new ArrayList<>();
-        handlers.addAll(endpointHandlers);
+        List<Handler> handlers = new ArrayList<>(endpointHandlers);
         handlers.add(new HttpHandler());
         handlers.add(new ServerProtocolHandler());
         handlers.add(new OperationHandler(service));
-        return handlers.stream().map(LoggingHandler::new).map(Handler.class::cast).toList();
+//        return handlers.stream().map(LoggingHandler::new).map(Handler.class::cast).toList();
+        return handlers;
     }
 
     private final class Work {

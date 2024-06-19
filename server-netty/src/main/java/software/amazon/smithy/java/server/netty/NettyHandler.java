@@ -28,7 +28,10 @@ import java.net.URI;
 import java.net.http.HttpHeaders;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicReference;
@@ -48,6 +51,7 @@ import software.amazon.smithy.java.server.core.ResolutionRequest;
 import software.amazon.smithy.java.server.core.ServerProtocol;
 import software.amazon.smithy.java.server.core.Value;
 import software.amazon.smithy.java.server.core.attributes.HttpAttributes;
+import software.amazon.smithy.java.server.core.http.HttpMethod;
 import software.amazon.smithy.java.server.exceptions.UnknownOperationException;
 import software.amazon.smithy.utils.Pair;
 
@@ -72,16 +76,12 @@ final class NettyHandler extends ChannelDuplexHandler {
         if (msg instanceof HttpRequest httpRequest) {
             URI uri = URI.create(httpRequest.uri());
             HttpHeaders headers = getHeaders(httpRequest);
+            HttpMethod method = HttpMethod.valueOf(httpRequest.method().name());
 
             Pair<Operation<?, ?>, ServerProtocol> operationProtocolPair;
             try {
                 operationProtocolPair = protocolResolver.resolveOperation(
-                    ResolutionRequest
-                        .builder()
-                        .uri(uri)
-                        .verb(httpRequest.method().name())
-                        .headers(headers)
-                        .build()
+                    new ResolutionRequest(method, uri, headers)
                 );
             } catch (UnknownOperationException e) {
                 e.printStackTrace();
@@ -97,7 +97,7 @@ final class NettyHandler extends ChannelDuplexHandler {
             Request request = createRequest(httpRequest);
             request.getContext().put(HttpAttributes.HTTP_HEADERS, headers);
             request.getContext().put(HttpAttributes.HTTP_URI, uri);
-            request.getContext().put(HttpAttributes.HTTP_METHOD, httpRequest.method().toString());
+            request.getContext().put(HttpAttributes.HTTP_METHOD, method.getName());
 
             job = new JobImpl(request, new ReplyImpl(), operationProtocolPair.left, operationProtocolPair.right);
 
@@ -238,12 +238,15 @@ final class NettyHandler extends ChannelDuplexHandler {
                                         .addListener(f -> {
                                             if (f.isSuccess()) {
                                                 sub.get().request(1);
+                                            } else {
+                                                f.cause().printStackTrace();
                                             }
                                         });
                                 }
 
                                 @Override
                                 public void onError(Throwable throwable) {
+                                    throwable.printStackTrace();
                                     channel.close();
                                 }
 

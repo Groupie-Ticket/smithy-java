@@ -47,22 +47,6 @@ public class ServiceGenerator implements
         List<Symbol> operations = operationsInfo.stream().map(OperationInfo::symbol).toList();
         directive.context().writerDelegator().useShapeWriter(shape, writer -> {
             writer.pushState(new ClassSection(shape));
-            var template = """
-                public final class ${service:T} implements ${serviceType:T} {
-                    ${id:C|}
-
-                    ${properties:C|}
-
-                    ${constructor:C|}
-
-                    ${builder:C|}
-
-                    @Override
-                    public <I, O> ${operationHolder:T}<I, O> getOperation(String operationName) {
-                        ${getOperation:C|}
-                    }
-                }
-                """;
             writer.putContext("operationHolder", Operation.class);
             writer.putContext("serviceType", Service.class);
             writer.putContext("service", directive.symbol());

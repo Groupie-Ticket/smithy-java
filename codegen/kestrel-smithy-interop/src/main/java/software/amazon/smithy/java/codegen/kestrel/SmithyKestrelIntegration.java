@@ -16,17 +16,19 @@ import software.amazon.smithy.java.codegen.kestrel.generators.ConverterMethodsGe
 import software.amazon.smithy.java.codegen.kestrel.generators.KestrelCodecFactoryGenerator;
 import software.amazon.smithy.java.kestrel.codec.KestrelCodecFactory;
 import software.amazon.smithy.java.kestrel.codec.KestrelStructure;
-import software.amazon.smithy.kestrel.codegen.*;
 import software.amazon.smithy.kestrel.codegen.CodeSections.StartClassSection;
+import software.amazon.smithy.kestrel.codegen.GenerationContext;
+import software.amazon.smithy.kestrel.codegen.JavaWriter;
+import software.amazon.smithy.kestrel.codegen.KestrelIntegration;
+import software.amazon.smithy.kestrel.codegen.KestrelSettings;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ServiceShape;
-import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.utils.CodeInterceptor;
 import software.amazon.smithy.utils.CodeSection;
 
 public class SmithyKestrelIntegration implements KestrelIntegration {
 
-    private static SymbolReference KESTREL_STRUCTURE = imp(KestrelStructure.class);
+    private static final SymbolReference KESTREL_STRUCTURE = imp(KestrelStructure.class);
 
 
     @Override
@@ -69,10 +71,11 @@ public class SmithyKestrelIntegration implements KestrelIntegration {
             var generator = section.generator();
             var symbol = generator.getSymbol();
             var smithySymbol = symbol.expectProperty(SMITHY_SYMBOL);
-            if (generator.getShape().hasTrait(StreamingTrait.class)) {
-                writer.write("public final class $L implements $T {", symbol.getName(), CommonSymbols.KestrelObject);
-                return;
-            }
+//            if (generator.getShape().hasTrait(StreamingTrait.class)) {
+//                writer.write("public final class $L implements $T {", symbol.getName(), CommonSymbols.KestrelObject);
+//                return;
+//            }
+
             writer.write(
                 """
                     public final class $L implements $T<$T> {""",
