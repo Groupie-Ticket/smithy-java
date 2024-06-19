@@ -5,16 +5,13 @@
 
 package software.amazon.smithy.java.runtime.core.serde;
 
-public class NoInitialEventException extends RuntimeException {
-
+public final class NoInitialEventException extends RuntimeException {
     public NoInitialEventException() {
+        super(null, null, false, false);
     }
 
-    public NoInitialEventException(String message) {
-        super(message);
-    }
-
-    public NoInitialEventException(String message, Throwable cause) {
-        super(message, cause);
+    @Override
+    public Throwable fillInStackTrace() {
+        return this;
     }
 }

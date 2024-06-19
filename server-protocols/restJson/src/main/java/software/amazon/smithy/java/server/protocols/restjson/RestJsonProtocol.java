@@ -9,6 +9,7 @@ import java.net.http.HttpHeaders;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import software.amazon.smithy.java.runtime.core.schema.*;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
@@ -40,8 +41,6 @@ import software.amazon.smithy.model.traits.HttpErrorTrait;
 import software.amazon.smithy.model.traits.HttpTrait;
 
 public final class RestJsonProtocol extends ServerProtocol {
-
-
     private final Codec codec;
 
     public RestJsonProtocol(final Service service) {
@@ -56,7 +55,7 @@ public final class RestJsonProtocol extends ServerProtocol {
 
     @Override
     public Operation<?, ?> resolveOperation(ResolutionRequest request) {
-        String path = request.getUri().getPath();
+        String path = request.uri().getPath();
         UriPattern uri = UriPattern.parse(path);
         Operation<?, ?> selectedOperation = null;
         for (Operation<?, ?> operation : getOperations()) {
@@ -70,7 +69,8 @@ public final class RestJsonProtocol extends ServerProtocol {
     }
 
     @Override
-    public void deserializeInput(Job job) {
+    public CompletableFuture<Void> deserializeInput(Job job) {
+
         ShapeBuilder<? extends SerializableStruct> shapeBuilder = job.operation().getApiOperation().inputBuilder();
         var deser = HttpBinding.requestDeserializer()
             .inputShapeBuilder(shapeBuilder)
@@ -107,6 +107,7 @@ public final class RestJsonProtocol extends ServerProtocol {
         }
 
         job.request().setValue(new ShapeValue<>(shapeBuilder.build()));
+        return CompletableFuture.completedFuture(null);
     }
 
     private DataStream getDataStream(Value value) {
@@ -120,7 +121,7 @@ public final class RestJsonProtocol extends ServerProtocol {
     }
 
     @Override
-    public void serializeOutput(Job job) {
+    public CompletableFuture<Void> serializeOutput(Job job) {
         ApiOperation<?, ?> apiOperation = job.operation().getApiOperation();
         ShapeValue<? extends SerializableStruct> shapeValue = job.reply().getValue();
         Schema schema;
@@ -173,6 +174,7 @@ public final class RestJsonProtocol extends ServerProtocol {
                 throw new RuntimeException(e);
             }
         }
+        return CompletableFuture.completedFuture(null);
     }
 
     private HttpHeaders addHeader(HttpHeaders headers, String name, String value) {

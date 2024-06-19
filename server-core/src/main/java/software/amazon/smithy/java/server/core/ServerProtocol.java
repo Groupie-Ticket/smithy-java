@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.server.core;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -20,7 +21,6 @@ public abstract class ServerProtocol {
         this.operations = List.copyOf(service.getAllOperations());
     }
 
-
     public abstract ShapeId getProtocolId();
 
     /**
@@ -31,9 +31,9 @@ public abstract class ServerProtocol {
      */
     public abstract Operation<?, ?> resolveOperation(ResolutionRequest request);
 
-    public abstract void deserializeInput(Job job);
+    public abstract CompletableFuture<Void> deserializeInput(Job job);
 
-    public abstract void serializeOutput(Job job);
+    public abstract CompletableFuture<Void> serializeOutput(Job job);
 
     protected List<Operation<?, ?>> getOperations() {
         return operations;
@@ -42,6 +42,4 @@ public abstract class ServerProtocol {
     protected Service getService() {
         return service;
     }
-
-
 }

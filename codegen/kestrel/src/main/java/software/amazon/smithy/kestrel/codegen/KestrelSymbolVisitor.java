@@ -7,6 +7,7 @@ package software.amazon.smithy.kestrel.codegen;
 
 import java.io.File;
 import software.amazon.smithy.codegen.core.CodegenException;
+import software.amazon.smithy.codegen.core.Property;
 import software.amazon.smithy.codegen.core.ReservedWordSymbolProvider;
 import software.amazon.smithy.codegen.core.ReservedWordsBuilder;
 import software.amazon.smithy.codegen.core.Symbol;
@@ -51,6 +52,8 @@ import software.amazon.smithy.model.traits.UniqueItemsTrait;
 import software.amazon.smithy.utils.StringUtils;
 
 public class KestrelSymbolVisitor implements SymbolProvider, ShapeVisitor<Symbol> {
+    public static final Property<Shape> SMITHY_SHAPE = Property.named("shape");
+
     private final Model model;
     private final ReservedWordSymbolProvider.Escaper escaper;
     private final ServiceShape service;
@@ -350,7 +353,7 @@ public class KestrelSymbolVisitor implements SymbolProvider, ShapeVisitor<Symbol
     }
 
     protected Symbol.Builder createSymbolBuilder(Shape shape, String typeName) {
-        return Symbol.builder().putProperty("shape", shape).name(typeName);
+        return Symbol.builder().putProperty(SMITHY_SHAPE, shape).name(typeName);
     }
 
     protected Symbol.Builder createSymbolBuilder(Shape shape, String typeName, String namespace) {

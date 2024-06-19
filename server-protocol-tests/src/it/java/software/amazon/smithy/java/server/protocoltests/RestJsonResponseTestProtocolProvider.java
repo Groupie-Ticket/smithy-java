@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.java.server.protocoltests;
 
+import java.util.concurrent.CompletableFuture;
 import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.java.server.core.Job;
@@ -50,11 +51,11 @@ public class RestJsonResponseTestProtocolProvider implements
 
         @Override
         public Operation<?, ?> resolveOperation(ResolutionRequest request) {
-            ShapeId serviceId = request.getHeaders()
+            ShapeId serviceId = request.headers()
                 .firstValue("x-protocol-test-service")
                 .map(ShapeId::from)
                 .orElse(ShapeId.from("unknown#service"));
-            ShapeId operationId = request.getHeaders()
+            ShapeId operationId = request.headers()
                 .firstValue("x-protocol-test-operation")
                 .map(ShapeId::from)
                 .orElse(ShapeId.from("unknown#service"));
@@ -70,13 +71,14 @@ public class RestJsonResponseTestProtocolProvider implements
         }
 
         @Override
-        public void deserializeInput(Job job) {
+        public CompletableFuture<Void> deserializeInput(Job job) {
             job.request().setValue(new ShapeValue(null));
+            return CompletableFuture.completedFuture(null);
         }
 
         @Override
-        public void serializeOutput(Job job) {
-            delegate.serializeOutput(job);
+        public CompletableFuture<Void> serializeOutput(Job job) {
+            return delegate.serializeOutput(job);
         }
     }
 }

@@ -5,6 +5,7 @@
 
 package software.amazon.smithy.kestrel.codegen;
 
+import java.nio.ByteBuffer;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolReference;
 
@@ -151,4 +152,11 @@ public final class CommonSymbols {
     );
     public static final SymbolReference StringMap = imp("software.amazon.smithy.java.kestrel", "StringMap");
     public static final SymbolReference StructureMap = imp("software.amazon.smithy.java.kestrel", "StructureMap");
+
+    public static final SymbolReference FLOW_PUBLISHER = Symbol.builder()
+        .namespace("java.util.concurrent.Flow", ".")
+        .name("Publisher")
+        .build()
+        .toReference(null);
+    public static final SymbolReference BYTE_BUFFER = imp(ByteBuffer.class);
 }

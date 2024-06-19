@@ -9,5 +9,5 @@ public interface KestrelCodecFactory {
 
     String serviceName();
 
-    KestrelCodec<?, ?, ?, ?> getCodec(String operationName);
+    KestrelCodec getCodec(String operationName);
 }

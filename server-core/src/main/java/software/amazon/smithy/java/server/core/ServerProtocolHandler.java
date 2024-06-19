@@ -5,20 +5,38 @@
 
 package software.amazon.smithy.java.server.core;
 
-public final class ServerProtocolHandler implements SyncHandler {
+import java.util.concurrent.CompletableFuture;
+
+public final class ServerProtocolHandler implements Handler {
 
     @Override
-    public void doBefore(Job job) {
+    public CompletableFuture<Void> before(Job job) {
         if (job.request().getValue().getClass() == ByteValue.class
             || job.request().getValue().getClass() == ReactiveByteValue.class) {
-            job.chosenProtocol().deserializeInput(job);
+            try {
+                return job.chosenProtocol().deserializeInput(job);
+            } catch (Throwable t) {
+                return CompletableFuture.failedFuture(t);
+            }
         }
+
+        return couldNotClaim();
+    }
+
+    private static CompletableFuture<Void> couldNotClaim() {
+        return CompletableFuture.failedFuture(new RuntimeException("Nothing claimed the job"));
     }
 
     @Override
-    public void doAfter(Job job) {
-        if (job.reply().getValue().getClass() == ShapeValue.class) {
-            job.chosenProtocol().serializeOutput(job);
+    public CompletableFuture<Void> after(Job job) {
+        // null check
+        if (job.reply().getValue() instanceof ShapeValue) {
+            try {
+                return job.chosenProtocol().serializeOutput(job);
+            } catch (Throwable t) {
+                return CompletableFuture.failedFuture(t);
+            }
         }
+        return CompletableFuture.completedFuture(null);
     }
 }

@@ -6,24 +6,31 @@
 package software.amazon.smithy.java.codegen.kestrel.generators;
 
 import static software.amazon.smithy.java.codegen.kestrel.InteropSymbolProperties.SMITHY_SYMBOL;
+import static software.amazon.smithy.kestrel.codegen.CommonSymbols.FLOW_PUBLISHER;
 import static software.amazon.smithy.kestrel.codegen.CommonSymbols.imp;
 
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Consumer;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.SymbolReference;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
+import software.amazon.smithy.java.kestrel.KestrelObject;
 import software.amazon.smithy.java.kestrel.codec.KestrelCodec;
 import software.amazon.smithy.java.kestrel.codec.KestrelCodecFactory;
 import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
+import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.kestrel.codegen.CommonSymbols;
 import software.amazon.smithy.kestrel.codegen.JavaWriter;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.TopDownIndex;
+import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
+import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.model.traits.StreamingTrait;
 
 public class KestrelCodecFactoryGenerator implements Consumer<JavaWriter> {
 
@@ -36,6 +43,8 @@ public class KestrelCodecFactoryGenerator implements Consumer<JavaWriter> {
     );
 
     private static final SymbolReference BYTE_BUFFER = imp(ByteBuffer.class);
+    private static final SymbolReference KESTREL_OBJECT = imp(KestrelObject.class);
+    private static final SymbolReference SERIALIZABLE_STRUCT = imp(SerializableStruct.class);
 
     private final ServiceShape service;
     private final Model model;
@@ -82,7 +91,7 @@ public class KestrelCodecFactoryGenerator implements Consumer<JavaWriter> {
         writer.putContext("kestrelCodec", KESTREL_CODEC);
         writer.putContext("serviceId", service.getId());
         writer.putContext("getCodec", new GetCodecGenerator(writer, service, operations));
-        writer.putContext("codecs", new CodecGenerator(service, model, symbolProvider, operationsInfo));
+        writer.putContext("codecs", new CodecGenerator(operationsInfo));
         writer.putContext("unknownOperationException", UNKNOWN_OPERATION_EXCEPTION);
         writer.putContext("kestrelDeser", CommonSymbols.KestrelDeserializer);
         writer.putContext("kestrelSer", CommonSymbols.KestrelSerializer);
@@ -99,7 +108,6 @@ public class KestrelCodecFactoryGenerator implements Consumer<JavaWriter> {
                   ${getCodec:C|}
 
                   ${codecs:C|}
-
             }
             """;
         writer.write(template);
@@ -132,14 +140,30 @@ public class KestrelCodecFactoryGenerator implements Consumer<JavaWriter> {
         }
     }
 
+    private boolean isEventStreaming(MemberShape memberShape) {
+        var shape = model.expectShape(memberShape.getTarget());
+        return shape.isUnionShape() && shape.hasTrait(StreamingTrait.class);
+    }
+
     private static String codecName(String operationName) {
         return operationName + "KestrelCodec";
     }
 
-    private record CodecGenerator(
-        ServiceShape service, Model model, SymbolProvider symbolProvider, List<OperationInfo> operations
-    ) implements
-        Consumer<JavaWriter> {
+    private class CodecGenerator implements Consumer<JavaWriter> {
+        private final List<OperationInfo> operations;
+
+        private CodecGenerator(List<OperationInfo> operations) {
+            this.operations = operations;
+        }
+
+        private Optional<MemberShape> getEventStreamingMember(ShapeId shapeId) {
+            return model.expectShape(shapeId)
+                .getAllMembers()
+                .values()
+                .stream()
+                .filter(member -> isEventStreaming(member))
+                .findFirst();
+        }
 
         @Override
         public void accept(JavaWriter writer) {
@@ -152,24 +176,43 @@ public class KestrelCodecFactoryGenerator implements Consumer<JavaWriter> {
                 writer.putContext("kestrelOutput", operation.kestrelOutputSymbol);
                 writer.putContext("byteBuf", BYTE_BUFFER);
                 writer.putContext("exceptionEncoder", new ExceptionEncoder(service, model, symbolProvider, operation));
+                writer.putContext("kestrelObject", KESTREL_OBJECT);
+                writer.putContext("serializableStruct", SERIALIZABLE_STRUCT);
+                getEventStreamingMember(operation.operationShape.getInputShape())
+                    .ifPresent(streamingMember -> {
+                        writer.putContext("deserializeEvent", new InboundEventStreamingGenerator(streamingMember));
+                    });
+                getEventStreamingMember(operation.operationShape.getOutputShape())
+                    .ifPresent(streamingMember -> {
+                        writer.putContext("serializeEvent", new OutboundEventStreamingGenerator(streamingMember));
+                    });
                 var template = """
-                    private static final class ${codecClass:L} extends ${kestrelCodec:T}<${input:T}, ${output:T}, ${kestrelInput:T}, ${kestrelOutput:T}> {
+                    private static final class ${codecClass:L} extends ${kestrelCodec:T} {
                         private static final ${codecClass:L} INSTANCE = new ${codecClass:L}();
 
                         private ${codecClass:L}() {
                         }
 
                         @Override
-                        public byte[] encode(${output:T} value) {
-                            return serialize(${kestrelOutput:T}.convertFrom(value));
+                        public byte[] encode(${serializableStruct:T} value) {
+                            return serialize(${kestrelOutput:T}.convertFrom((${output:T}) value));
                         }
 
+                        ${exceptionEncoder:C|}
+
+                        ${?serializeEvent}
+                        ${serializeEvent:C|}${/serializeEvent}
+
+                        ${^deserializeEvent}
                         @Override
                         public ${input:T} decode(${byteBuf:T} buf) {
                             return deserialize(buf, new ${kestrelInput:T}());
                         }
 
-                        ${exceptionEncoder:C|}
+                        ${/deserializeEvent}
+                        ${?deserializeEvent}
+
+                        ${deserializeEvent:C|}${/deserializeEvent}
                     }
                     """;
                 writer.write(template);
@@ -213,6 +256,78 @@ public class KestrelCodecFactoryGenerator implements Consumer<JavaWriter> {
                 writer.popState();
 
             }
+        }
+    }
+
+    private class InboundEventStreamingGenerator implements Consumer<JavaWriter> {
+        private final MemberShape memberShape;
+
+        private InboundEventStreamingGenerator(MemberShape memberShape) {
+            this.memberShape = memberShape;
+        }
+
+        @Override
+        public void accept(JavaWriter writer) {
+            writer.pushState();
+            writer.putContext("publisher", FLOW_PUBLISHER);
+            var decodeTemplate = """
+                @Override
+                public ${input:T} decodeInitialRequest(${byteBuf:T} buffer, ${publisher:T}<?> publisher) {
+                    return deserializeStreaming(buffer, new ${kestrelInput:T}(), publisher);
+                }""";
+            writer.write(decodeTemplate);
+            writer.popState();
+
+            writer.pushState();
+            var target = model.expectShape(memberShape.getTarget());
+            var kestrelType = symbolProvider.toSymbol(target);
+            var smithySymbol = kestrelType.expectProperty(SMITHY_SYMBOL);
+            writer.putContext("smithySymbol", smithySymbol);
+            writer.putContext("kestrelSymbol", kestrelType);
+            writer.write("""
+
+                @Override
+                public ${smithySymbol:T} deserializeEvent(${byteBuf:T} buf) {
+                    return deserialize(buf, new ${kestrelSymbol:T}());
+                }""");
+            writer.popState();
+        }
+    }
+
+    private class OutboundEventStreamingGenerator implements Consumer<JavaWriter> {
+        private final MemberShape memberShape;
+
+        private OutboundEventStreamingGenerator(MemberShape memberShape) {
+            this.memberShape = memberShape;
+        }
+
+        @Override
+        public void accept(JavaWriter writer) {
+            writer.pushState();
+            writer.putContext("publisher", FLOW_PUBLISHER);
+            writer.putContext("serializableStruct", SERIALIZABLE_STRUCT);
+            writer.putContext("member", memberShape.getMemberName());
+            var encodeTemplate = """
+                @Override
+                public ${publisher:T}<? extends ${serializableStruct:T}> getStreamMember(${serializableStruct:T} output) {
+                    return ((${output:T}) output).${member:L}();
+                }""";
+            writer.write(encodeTemplate);
+            writer.popState();
+
+            writer.pushState();
+            var target = model.expectShape(memberShape.getTarget());
+            var kestrelType = symbolProvider.toSymbol(target);
+            var smithySymbol = kestrelType.expectProperty(SMITHY_SYMBOL);
+            writer.putContext("smithySymbol", smithySymbol);
+            writer.putContext("kestrelSymbol", kestrelType);
+            writer.write("""
+
+                @Override
+                public byte[] encodeEvent(${serializableStruct:T} event) {
+                    return serialize(${kestrelSymbol:T}.convertFrom((${smithySymbol:T}) event));
+                }""");
+            writer.popState();
         }
     }
 

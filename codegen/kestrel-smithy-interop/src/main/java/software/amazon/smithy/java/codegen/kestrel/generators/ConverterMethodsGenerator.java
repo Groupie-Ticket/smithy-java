@@ -8,12 +8,14 @@ package software.amazon.smithy.java.codegen.kestrel.generators;
 import static java.util.function.Function.identity;
 import static software.amazon.smithy.java.codegen.kestrel.InteropSymbolProperties.SMITHY_MEMBER;
 import static software.amazon.smithy.java.codegen.kestrel.InteropSymbolProperties.SMITHY_SYMBOL;
+import static software.amazon.smithy.kestrel.codegen.CommonSymbols.FLOW_PUBLISHER;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 import software.amazon.smithy.codegen.core.Symbol;
@@ -22,6 +24,7 @@ import software.amazon.smithy.kestrel.codegen.CommonSymbols;
 import software.amazon.smithy.kestrel.codegen.JavaWriter;
 import software.amazon.smithy.kestrel.codegen.StructureGenerator;
 import software.amazon.smithy.model.Model;
+import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.ErrorTrait;
@@ -42,10 +45,6 @@ public class ConverterMethodsGenerator implements CodeInterceptor<EndClassSectio
         var generator = section.generator();
         var model = generator.getModel();
         var smithySymbol = generator.getSymbol().expectProperty(SMITHY_SYMBOL);
-        if (generator.getShape().hasTrait(StreamingTrait.class)) {
-            return;
-        }
-
         var template = """
 
             @Override
@@ -58,19 +57,21 @@ public class ConverterMethodsGenerator implements CodeInterceptor<EndClassSectio
                 return ${smithySymbol:T}.ID;
             }
 
-            @Override
-            public ${smithySymbol:T} convertTo() {
-                ${convertTo:C|}
-            }
+            ${convertTo:C|}
 
             public static ${kestrelSymbol:T} convertFrom(${smithySymbol:T} o) {
                 ${convertFrom:C|}
             }
 
-
             """;
 
         writer.pushState();
+        var streamingMember = generator.getShape()
+            .getAllMembers()
+            .values()
+            .stream()
+            .filter(member -> isEventStream(model, member))
+            .findFirst();
         writer.putContext("smithySymbol", smithySymbol);
         writer.putContext("kestrelSymbol", generator.getSymbol());
         writer.putContext("hashMap", CommonSymbols.imp(HashMap.class));
@@ -79,20 +80,34 @@ public class ConverterMethodsGenerator implements CodeInterceptor<EndClassSectio
         writer.putContext("map", CommonSymbols.imp(Map.class));
         writer.putContext("byteBuffer", CommonSymbols.imp(ByteBuffer.class));
         writer.putContext("shapeId", CommonSymbols.imp(ShapeId.class));
-        writer.putContext("convertTo", new ConvertToGenerator(generator, writer, smithySymbol, model));
+        writer.putContext("hashMap", CommonSymbols.imp("java.util", "HashMap"));
+        writer.putContext("arrayList", CommonSymbols.imp("java.util", "ArrayList"));
+        writer.putContext("list", CommonSymbols.imp("java.util", "List"));
+        writer.putContext("byteBuffer", CommonSymbols.imp("java.nio", "ByteBuffer"));
+        writer.putContext("convertTo", new ConvertToGenerator(generator, writer, smithySymbol, model, streamingMember));
         writer.putContext("convertFrom", new ConvertFromGenerator(generator, writer, smithySymbol, model));
         writer.write(template);
         writer.popState();
 
     }
 
+    private static boolean isEventStream(Model model, MemberShape memberShape) {
+        var target = model.expectShape(memberShape.getTarget());
+        return target.isUnionShape() && target.hasTrait(StreamingTrait.class);
+    }
+
     private record ConvertToGenerator(
         StructureGenerator generator, JavaWriter writer,
-        Symbol smithySymbol, Model model
+        Symbol smithySymbol, Model model, Optional<MemberShape> eventStreamMember
     ) implements Runnable {
-
         @Override
         public void run() {
+            eventStreamMember.ifPresent(member -> {
+                writer.putContext("publisher", FLOW_PUBLISHER);
+            });
+            writer.openBlock(
+                "@Override\npublic ${smithySymbol:T} convertTo(${?publisher}${publisher:T}<?> publisher${/publisher}) {"
+            );
             writer.write("var builder = ${smithySymbol:T}.builder();");
             Stream.of(
                 generator.getAllVarintMembers(),
@@ -196,8 +211,24 @@ public class ConverterMethodsGenerator implements CodeInterceptor<EndClassSectio
                         """.formatted(kestrelValue));
                     writer.popState();
                 });
-            writer.write("return builder.build();");
 
+            eventStreamMember.ifPresent(member -> {
+                writer.putContext("streamingMember", member.getMemberName());
+                Symbol kestrelMemberSymbol = generator.getSymbolProvider().toSymbol(member);
+                writer.putContext(
+                    "builderMethod",
+                    kestrelMemberSymbol.expectProperty(SMITHY_MEMBER)
+                );
+                var smithyEventType = generator.getSymbolProvider()
+                    .toSymbol(model.expectShape(member.getTarget()))
+                    .expectProperty(SMITHY_SYMBOL);
+                writer.putContext("streamType", smithyEventType);
+                writer.write("""
+                    builder.${builderMethod:L}((${publisher:T}<${streamType:T}>) publisher);""");
+            });
+
+            writer.write("return builder.build();");
+            writer.closeBlock("}");
         }
     }
 

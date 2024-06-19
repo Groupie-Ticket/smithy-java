@@ -13,6 +13,7 @@ public final class ServiceSchema {
 
     private final ShapeId id;
     private final List<ShapeId> supportedProtocols;
+    private final List<ShapeId> awsAuthModes;
 
     public ShapeId getId() {
         return id;
@@ -22,9 +23,14 @@ public final class ServiceSchema {
         return supportedProtocols;
     }
 
+    public List<ShapeId> getAwsAuthModes() {
+        return awsAuthModes;
+    }
+
     private ServiceSchema(Builder builder) {
         this.id = builder.id;
         this.supportedProtocols = Collections.unmodifiableList(builder.supportedProtocols);
+        this.awsAuthModes = Collections.unmodifiableList(builder.awsAuthModes);
     }
 
     public static Builder builder() {
@@ -35,6 +41,7 @@ public final class ServiceSchema {
 
         private ShapeId id;
         private List<ShapeId> supportedProtocols;
+        private List<ShapeId> awsAuthModes = Collections.emptyList();
 
         public Builder id(ShapeId shapeId) {
             this.id = shapeId;
@@ -43,6 +50,11 @@ public final class ServiceSchema {
 
         public Builder supportedProtocols(List<ShapeId> supportedProtocols) {
             this.supportedProtocols = supportedProtocols;
+            return this;
+        }
+
+        public Builder awsAuthModes(List<ShapeId> awsAuthModes) {
+            this.awsAuthModes = awsAuthModes;
             return this;
         }
 
