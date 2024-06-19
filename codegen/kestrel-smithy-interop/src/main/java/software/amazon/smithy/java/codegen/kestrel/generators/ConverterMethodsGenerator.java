@@ -80,10 +80,6 @@ public class ConverterMethodsGenerator implements CodeInterceptor<EndClassSectio
         writer.putContext("map", CommonSymbols.imp(Map.class));
         writer.putContext("byteBuffer", CommonSymbols.imp(ByteBuffer.class));
         writer.putContext("shapeId", CommonSymbols.imp(ShapeId.class));
-        writer.putContext("hashMap", CommonSymbols.imp("java.util", "HashMap"));
-        writer.putContext("arrayList", CommonSymbols.imp("java.util", "ArrayList"));
-        writer.putContext("list", CommonSymbols.imp("java.util", "List"));
-        writer.putContext("byteBuffer", CommonSymbols.imp("java.nio", "ByteBuffer"));
         writer.putContext("convertTo", new ConvertToGenerator(generator, writer, smithySymbol, model, streamingMember));
         writer.putContext("convertFrom", new ConvertFromGenerator(generator, writer, smithySymbol, model));
         writer.write(template);
