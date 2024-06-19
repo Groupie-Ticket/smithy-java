@@ -6,13 +6,16 @@
 package software.amazon.smithy.java.codegen.kestrel;
 
 import static software.amazon.smithy.java.codegen.kestrel.InteropSymbolProperties.SMITHY_SYMBOL;
+import static software.amazon.smithy.kestrel.codegen.CommonSymbols.imp;
 
 import java.io.File;
 import java.util.List;
 import software.amazon.smithy.codegen.core.SymbolProvider;
+import software.amazon.smithy.codegen.core.SymbolReference;
 import software.amazon.smithy.java.codegen.kestrel.generators.ConverterMethodsGenerator;
 import software.amazon.smithy.java.codegen.kestrel.generators.KestrelCodecFactoryGenerator;
 import software.amazon.smithy.java.kestrel.codec.KestrelCodecFactory;
+import software.amazon.smithy.java.kestrel.codec.KestrelStructure;
 import software.amazon.smithy.kestrel.codegen.*;
 import software.amazon.smithy.kestrel.codegen.CodeSections.StartClassSection;
 import software.amazon.smithy.model.Model;
@@ -22,6 +25,8 @@ import software.amazon.smithy.utils.CodeInterceptor;
 import software.amazon.smithy.utils.CodeSection;
 
 public class SmithyKestrelIntegration implements KestrelIntegration {
+
+    private static SymbolReference KESTREL_STRUCTURE = imp(KestrelStructure.class);
 
 
     @Override
@@ -65,7 +70,6 @@ public class SmithyKestrelIntegration implements KestrelIntegration {
             var symbol = generator.getSymbol();
             var smithySymbol = symbol.expectProperty(SMITHY_SYMBOL);
             if (generator.getShape().hasTrait(StreamingTrait.class)) {
-//                smithySymbol = CommonSymbols.Object.getSymbol();
                 writer.write("public final class $L implements $T {", symbol.getName(), CommonSymbols.KestrelObject);
                 return;
             }
@@ -73,7 +77,7 @@ public class SmithyKestrelIntegration implements KestrelIntegration {
                 """
                     public final class $L implements $T<$T> {""",
                 symbol.getName(),
-                CommonSymbols.KestrelStructure,
+                KESTREL_STRUCTURE,
                 smithySymbol
             );
         }

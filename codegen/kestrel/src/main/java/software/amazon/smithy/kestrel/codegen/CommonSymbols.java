@@ -11,6 +11,7 @@ import software.amazon.smithy.codegen.core.SymbolReference;
 public final class CommonSymbols {
     private CommonSymbols() {}
 
+
     public enum UseOption implements SymbolReference.Option {
         STATIC
     }
@@ -21,6 +22,14 @@ public final class CommonSymbols {
             .name(name)
             .build()
             .toReference(null, UseOption.STATIC);
+    }
+
+    public static SymbolReference imp(Class<?> klass) {
+        return Symbol.builder()
+            .namespace(klass.getPackageName(), ".")
+            .name(klass.getSimpleName())
+            .build()
+            .toReference(null);
     }
 
     public static SymbolReference imp(String namespace, String name) {
@@ -119,10 +128,6 @@ public final class CommonSymbols {
     );
 
     public static final SymbolReference KestrelObject = imp("software.amazon.smithy.java.kestrel", "KestrelObject");
-    public static final SymbolReference KestrelStructure = imp(
-        "software.amazon.smithy.java.kestrel",
-        "KestrelStructure"
-    );
     public static final SymbolReference KestrelSerializer = imp(
         "software.amazon.smithy.java.kestrel",
         "KestrelSerializer"

@@ -8,12 +8,16 @@ package software.amazon.smithy.java.codegen.kestrel.generators;
 import static software.amazon.smithy.java.codegen.kestrel.InteropSymbolProperties.SMITHY_SYMBOL;
 import static software.amazon.smithy.kestrel.codegen.CommonSymbols.imp;
 
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.function.Consumer;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.SymbolReference;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
+import software.amazon.smithy.java.kestrel.codec.KestrelCodec;
+import software.amazon.smithy.java.kestrel.codec.KestrelCodecFactory;
+import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.kestrel.codegen.CommonSymbols;
 import software.amazon.smithy.kestrel.codegen.JavaWriter;
 import software.amazon.smithy.model.Model;
@@ -23,23 +27,15 @@ import software.amazon.smithy.model.shapes.ServiceShape;
 
 public class KestrelCodecFactoryGenerator implements Consumer<JavaWriter> {
 
-    private static final SymbolReference CODEC_FACTORY = imp(
-        "software.amazon.smithy.java.kestrel.codec",
-        "KestrelCodecFactory"
-    );
-    private static final SymbolReference KESTREL_CODEC = imp(
-        "software.amazon.smithy.java.kestrel.codec",
-        "KestrelCodec"
-    );
+    private static final SymbolReference CODEC_FACTORY = imp(KestrelCodecFactory.class);
+    private static final SymbolReference KESTREL_CODEC = imp(KestrelCodec.class);
+
     private static final SymbolReference UNKNOWN_OPERATION_EXCEPTION = imp(
         "software.amazon.smithy.java.server.exceptions",
         "UnknownOperationException"
     );
 
-    private static final SymbolReference BYTE_BUFFER = imp(
-        "java.nio",
-        "ByteBuffer"
-    );
+    private static final SymbolReference BYTE_BUFFER = imp(ByteBuffer.class);
 
     private final ServiceShape service;
     private final Model model;
@@ -86,10 +82,13 @@ public class KestrelCodecFactoryGenerator implements Consumer<JavaWriter> {
         writer.putContext("kestrelCodec", KESTREL_CODEC);
         writer.putContext("serviceId", service.getId());
         writer.putContext("getCodec", new GetCodecGenerator(writer, service, operations));
-        writer.putContext("codecs", new CodecGenerator(service, operationsInfo));
+        writer.putContext("codecs", new CodecGenerator(service, model, symbolProvider, operationsInfo));
         writer.putContext("unknownOperationException", UNKNOWN_OPERATION_EXCEPTION);
         writer.putContext("kestrelDeser", CommonSymbols.KestrelDeserializer);
         writer.putContext("kestrelSer", CommonSymbols.KestrelSerializer);
+        writer.putContext("kestrelObj", CommonSymbols.KestrelObject);
+        writer.putContext("kestrelStruct", CommonSymbols.imp(KestrelCodec.class));
+        writer.putContext("modeledException", imp(ModeledApiException.class));
         var template = """
             public final class ${codecFactoryImpl:L} implements ${codecFactory:T} {
                   @Override
@@ -137,7 +136,9 @@ public class KestrelCodecFactoryGenerator implements Consumer<JavaWriter> {
         return operationName + "KestrelCodec";
     }
 
-    private record CodecGenerator(ServiceShape service, List<OperationInfo> operations) implements
+    private record CodecGenerator(
+        ServiceShape service, Model model, SymbolProvider symbolProvider, List<OperationInfo> operations
+    ) implements
         Consumer<JavaWriter> {
 
         @Override
@@ -150,6 +151,7 @@ public class KestrelCodecFactoryGenerator implements Consumer<JavaWriter> {
                 writer.putContext("kestrelInput", operation.kestrelInputSymbol);
                 writer.putContext("kestrelOutput", operation.kestrelOutputSymbol);
                 writer.putContext("byteBuf", BYTE_BUFFER);
+                writer.putContext("exceptionEncoder", new ExceptionEncoder(service, model, symbolProvider, operation));
                 var template = """
                     private static final class ${codecClass:L} extends ${kestrelCodec:T}<${input:T}, ${output:T}, ${kestrelInput:T}, ${kestrelOutput:T}> {
                         private static final ${codecClass:L} INSTANCE = new ${codecClass:L}();
@@ -166,12 +168,51 @@ public class KestrelCodecFactoryGenerator implements Consumer<JavaWriter> {
                         public ${input:T} decode(${byteBuf:T} buf) {
                             return deserialize(buf, new ${kestrelInput:T}());
                         }
+
+                        ${exceptionEncoder:C|}
                     }
                     """;
                 writer.write(template);
                 writer.popState();
             }
 
+        }
+
+        private record ExceptionEncoder(
+            ServiceShape service, Model model, SymbolProvider symbolProvider, OperationInfo operationInfo
+        ) implements Consumer<JavaWriter> {
+
+            @Override
+            public void accept(JavaWriter writer) {
+                var errors = operationInfo.operationShape.getErrors()
+                    .stream()
+                    .map(model::expectShape)
+                    .map(symbolProvider::toSymbol)
+                    .toList();
+                writer.pushState();
+                writer.putContext("errorMatcher", writer.consumer(w -> {
+                    for (var error : errors) {
+                        var smithySymbol = error.expectProperty(SMITHY_SYMBOL);
+                        writer.putContext("kestrelError", error);
+                        writer.putContext("smithyError", smithySymbol);
+                        w.write("""
+                            if (exception instanceof ${smithyError:T} e) {
+                                return ${kestrelError:T}.convertFrom(e);
+                            }
+                            """);
+                    }
+                }));
+                var template = """
+                    @Override
+                    public ${kestrelObj:T} convertException(Throwable exception) {
+                        ${errorMatcher:C|}
+                        return createSynthetic(exception);
+                    }
+                    """;
+                writer.write(template);
+                writer.popState();
+
+            }
         }
     }
 

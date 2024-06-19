@@ -14,12 +14,17 @@ import software.amazon.smithy.java.kestrel.codec.KestrelCodec;
 import software.amazon.smithy.java.kestrel.codec.KestrelCodecFactory;
 import software.amazon.smithy.java.kestrel.codec.KestrelCodecFactoryIndex;
 import software.amazon.smithy.java.runtime.core.Context;
+import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
+import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
+import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.java.server.core.*;
 import software.amazon.smithy.java.server.core.attributes.HttpAttributes;
+import software.amazon.smithy.java.server.exceptions.InternalServerException;
 import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.model.traits.HttpErrorTrait;
 import software.amazon.smithy.utils.Pair;
 
 final class RpcV2KestrelProtocol extends ServerProtocol {
@@ -70,12 +75,30 @@ final class RpcV2KestrelProtocol extends ServerProtocol {
     @Override
     public void serializeOutput(Job job) {
         KestrelCodec<?, SerializableStruct, ?, ?> codec = job.request().getContext().get(KESTREL_CODEC);
+        ApiOperation<?, ?> apiOperation = job.operation().getApiOperation();
         ShapeValue<SerializableStruct> value = job.reply().getValue();
         SerializableStruct output = value.get();
-        job.reply().setValue(new ByteValue(codec.encode(output)));
+        byte[] serialized;
+        HttpErrorTrait errorTrait = null;
+        if (output instanceof Exception e) {
+            Schema schema;
+            if (e instanceof ModeledApiException me && (schema = apiOperation.exceptionSchema(me)) != null) {
+                errorTrait = schema.getTrait(HttpErrorTrait.class);
+                serialized = codec.encodeException(schema, e);
+            } else {
+                errorTrait = InternalServerException.SCHEMA.getTrait(HttpErrorTrait.class);
+                serialized = codec.encodeException(InternalServerException.SCHEMA, new InternalServerException(e));
+            }
+        } else {
+            serialized = codec.encode(output);
+        }
+        job.reply().setValue(new ByteValue(serialized));
         Map<String, List<String>> headers = new HashMap<>();
         headers.put("smithy-protocol", List.of("rpc-v2-kestrel"));
         headers.put("Content-Type", List.of("application/vnd.amazon.kestrel"));
+        if (errorTrait != null) {
+            job.reply().context().put(HttpAttributes.STATUS_CODE, errorTrait.getCode());
+        }
         job.reply().context().put(HttpAttributes.HTTP_HEADERS, HttpHeaders.of(headers, (x, y) -> true));
     }
 }
