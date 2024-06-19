@@ -19,6 +19,7 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandleProxies;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URI;
@@ -31,6 +32,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
@@ -54,7 +56,10 @@ import software.amazon.smithy.java.server.Server;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.java.server.netty.NettyServerBuilder;
 import software.amazon.smithy.model.Model;
+import software.amazon.smithy.model.node.Node;
+import software.amazon.smithy.model.node.NumberNode;
 import software.amazon.smithy.model.node.ObjectNode;
+import software.amazon.smithy.model.node.StringNode;
 import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -303,7 +308,7 @@ public class EndToEndProtocolTests {
         var captor = mock.expectRequest();
         var c = getClient(endpoint);
         c.sendRequest(rawRequest);
-        assertEquals(deserializedRequest, captor.get());
+        assertEquals(scrubNANs(deserializedRequest), scrubNANs(captor.get()));
     }
 
     @TestTemplate
@@ -347,8 +352,8 @@ public class EndToEndProtocolTests {
                 assertEquals(expectedMediaType, serviceResponse.headers().get(HttpHeaderNames.CONTENT_TYPE));
                 if (expectedMediaType.equals("application/json")) {
                     assertEquals(
-                        ObjectNode.parse(expectedBody),
-                        ObjectNode.parse(serviceResponse.content().toString(StandardCharsets.UTF_8))
+                        scrubJSONNaNs(ObjectNode.parse(expectedBody)),
+                        scrubJSONNaNs(ObjectNode.parse(serviceResponse.content().toString(StandardCharsets.UTF_8)))
                     );
                 } else {
                     assertEquals(expectedBody, serviceResponse.content().toString(StandardCharsets.UTF_8));
@@ -470,5 +475,60 @@ public class EndToEndProtocolTests {
     record HttpResponse(
         int code, Map<String, String> headers, Optional<String> body, Optional<String> bodyMediaType
     ) {}
+
+    private final float FNAN_STANDIN = ThreadLocalRandom.current().nextFloat();
+    private final double DNAN_STANDIN = ThreadLocalRandom.current().nextDouble();
+
+    private <T> T scrubNANs(T obj) {
+        try {
+            for (Field f : obj.getClass().getDeclaredFields()) {
+                if (f.getType() == double.class ||
+                    f.getType() == Double.class) {
+                    f.setAccessible(true);
+                    Double dVal = (Double) f.get(obj);
+                    if (dVal != null && dVal.isNaN()) {
+                        f.set(obj, DNAN_STANDIN);
+                    }
+                }
+                if (f.getType() == float.class ||
+                        f.getType() == Float.class) {
+                    f.setAccessible(true);
+                    Float fVal = (Float) f.get(obj);
+                    if (fVal != null && fVal.isNaN()) {
+                        f.set(obj, FNAN_STANDIN);
+                    }
+                }
+            }
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
+        return obj;
+    }
+
+    private Node scrubJSONNaNs(Node n) {
+        if (n.isNumberNode() && n.expectNumberNode().isNaN()) {
+            return new NumberNode(DNAN_STANDIN, n.getSourceLocation());
+        }
+        if (n.isObjectNode()) {
+            var builder = ObjectNode.builder();
+            for (Map.Entry<StringNode, Node> member : ((ObjectNode) n).getMembers().entrySet()) {
+                if (member.getValue().isNumberNode()) {
+                    if (member.getValue().expectNumberNode().isNaN()) {
+                        builder.withMember(member.getKey(),
+                                new NumberNode(DNAN_STANDIN, member.getValue().getSourceLocation()));
+                    } else {
+                        builder.withMember(member.getKey(), member.getValue());
+                    }
+                } else if (member.getValue().isObjectNode()) {
+                    builder.withMember(member.getKey(), scrubNANs(member.getValue()));
+                } else {
+                    builder.withMember(member.getKey(), member.getValue());
+                }
+            }
+            return builder.build();
+        }
+        return n;
+    }
+
 
 }
