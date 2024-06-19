@@ -32,7 +32,7 @@ public class DefaultOrchestratorImpl implements Orchestrator {
     @Override
     public CompletableFuture<Job> enqueue(Job job) {
         CompletableFuture<Job> future = new CompletableFuture<>();
-        queue.add(new Work(job, handlers, queue, future));
+        queue.add(new JobWork(job, handlers, queue, future));
         return future;
     }
 
@@ -45,7 +45,22 @@ public class DefaultOrchestratorImpl implements Orchestrator {
         return handlers;
     }
 
-    private final class Work {
+    @Override
+    public void execute(Runnable command) {
+        queue.add(new GenericWork(command));
+    }
+
+    private sealed interface Work extends Runnable {}
+
+    private record GenericWork(Runnable command) implements Work {
+
+        @Override
+        public void run() {
+            command.run();
+        }
+    }
+
+    private final class JobWork implements Work {
         private final Job job;
         private final Queue<Handler> queue;
         private final BlockingQueue<Work> workQueue;
@@ -53,7 +68,7 @@ public class DefaultOrchestratorImpl implements Orchestrator {
         private final Deque<Handler> soFar;
         private State state = State.BEFORE;
 
-        private Work(Job job, List<Handler> handlers, BlockingQueue<Work> workQueue, CompletableFuture<Job> signal) {
+        private JobWork(Job job, List<Handler> handlers, BlockingQueue<Work> workQueue, CompletableFuture<Job> signal) {
             this.job = job;
             this.queue = new ArrayDeque<>(handlers);
             this.workQueue = workQueue;
@@ -61,7 +76,8 @@ public class DefaultOrchestratorImpl implements Orchestrator {
             this.soFar = new ArrayDeque<>();
         }
 
-        public void work() {
+        @Override
+        public void run() {
             try {
                 if ((job.isDone() || job.getFailure().isPresent()) && state == State.BEFORE) {
                     state = State.AFTER;
@@ -146,10 +162,10 @@ public class DefaultOrchestratorImpl implements Orchestrator {
             try {
                 while (true) {
                     Work work = workQueue.take();
-                    work.work();
+                    work.run();
                 }
             } catch (InterruptedException ignored) {
-
+                Thread.currentThread().interrupt();
             }
         }
     }

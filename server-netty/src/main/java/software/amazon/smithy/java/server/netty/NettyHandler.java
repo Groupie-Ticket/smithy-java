@@ -112,7 +112,7 @@ final class NettyHandler extends ChannelDuplexHandler {
 
             if (operationProtocolPair.left.getApiOperation().streamingInput()) {
                 channel.config().setAutoRead(false);
-                bodyPublisher = new RequestBodyPublisher(channel);
+                bodyPublisher = new RequestBodyPublisher(channel, orchestrator);
                 request.setValue(new ReactiveByteValue(bodyPublisher));
                 writeResponse(channel, orchestrator.enqueue(job));
             } else {

@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.concurrent.Executor;
 import java.util.concurrent.Flow;
 import java.util.function.Supplier;
 
@@ -20,6 +21,7 @@ final class RequestBodyPublisher implements Flow.Publisher<ByteBuffer> {
     //Guards the requestBodySubscriber;
     private final Object requestBodySubscriberLock = new Object();
     private final Channel channel;
+    private final Executor downstreamExecutor;
     private final Duration maxSwallowDuration;
     private final Supplier<Instant> clock = Instant::now;
     private long pendingReads = 0;
@@ -29,8 +31,9 @@ final class RequestBodyPublisher implements Flow.Publisher<ByteBuffer> {
     private boolean readRequested = false;
     private Throwable closedException;
 
-    RequestBodyPublisher(Channel channel) {
+    RequestBodyPublisher(Channel channel, Executor downstreamExecutor) {
         this.channel = channel;
+        this.downstreamExecutor = downstreamExecutor;
         this.maxSwallowDuration = Duration.ofSeconds(10);
     }
 
@@ -119,7 +122,8 @@ final class RequestBodyPublisher implements Flow.Publisher<ByteBuffer> {
             } else {
                 byte[] copy = new byte[buf.readableBytes()];
                 buf.readBytes(copy);
-                requestBodySubscriber.onNext(ByteBuffer.wrap(copy));
+                var sub = requestBodySubscriber;
+                downstreamExecutor.execute(() -> sub.onNext(ByteBuffer.wrap(copy)));
             }
             if (swallowStart != null && !maxSwallowDuration.isNegative() && !maxSwallowDuration.isZero() &&
                 clock.get().isAfter(swallowStart.plus(maxSwallowDuration))) {
@@ -139,12 +143,14 @@ final class RequestBodyPublisher implements Flow.Publisher<ByteBuffer> {
             if (requestBodySubscriber == null) {
                 buf.release();
             } else {
-                Flow.Subscriber<? super ByteBuffer> s = this.requestBodySubscriber;
+                var sub = this.requestBodySubscriber;
                 this.requestBodySubscriber = null;
                 byte[] copy = new byte[buf.readableBytes()];
                 buf.readBytes(copy);
-                s.onNext(ByteBuffer.wrap(copy));
-                s.onComplete();
+                downstreamExecutor.execute(() -> {
+                    sub.onNext(ByteBuffer.wrap(copy));
+                    sub.onComplete();
+                });
             }
         }
     }
@@ -157,7 +163,10 @@ final class RequestBodyPublisher implements Flow.Publisher<ByteBuffer> {
             closed = true;
             closedException = throwable;
             if (requestBodySubscriber != null) {
-                requestBodySubscriber.onError(throwable);
+                var sub = requestBodySubscriber;
+                downstreamExecutor.execute(() -> {
+                    sub.onError(throwable);
+                });
                 requestBodySubscriber = null;
             }
             swallowRemainingRequestData();
