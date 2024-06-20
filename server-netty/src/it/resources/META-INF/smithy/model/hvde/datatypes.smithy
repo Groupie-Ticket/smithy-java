@@ -122,6 +122,11 @@ string EdgeSubscriptionId
 @length(min: 1, max: 100)
 string DataSyncEngineId
 
+// keep this in sync with https://code.amazon.com/packages/AwsVltrnHlControlPlaneModel/blobs/mainline/--/model/attributes/datatypes.smithy#L12
+@length(min: 1, max: 100)
+@pattern("^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
+string AttributeName
+
 @documentation("Status for EdgeSubscription")
 enum EdgeSubscriptionStatus {
     EDGE_UPDATE_PENDING
@@ -220,7 +225,7 @@ structure EdgeSubscriptionAttribute {
     // @required
     @documentation("Attribute name the associated Attribute")
     @idx(5)
-    attributeName: ResourceName // ResourceName has to be the same as defined in ControlPlaneModel
+    attributeName: AttributeName // AttributeName has to be the same as defined in ControlPlaneModel
 }
 
 structure EdgeSubscriptionAttribute {
@@ -246,7 +251,7 @@ structure EdgeSubscriptionAttribute {
     // @required
     @documentation("Attribute name the associated Attribute")
     @idx(5)
-    attributeName: ResourceName // ResourceName has to be the same as defined in ControlPlaneModel
+    attributeName: AttributeName // AttributeName has to be the same as defined in ControlPlaneModel
 }
 
 enum EdgeSubscriptionChangeType {
@@ -275,7 +280,7 @@ structure AttributeValueUpdate {
 @length(min: 1, max: 50)
 map AttributeValueUpdates {
     @documentation("The attributeName as key for the value updates")
-    key: ResourceName,
+    key: AttributeName,
     value: AttributeValueUpdate
 }
 

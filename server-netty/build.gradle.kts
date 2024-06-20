@@ -37,8 +37,8 @@ val generateSrcTask = tasks.register<JavaExec>("generateSources") {
     dependsOn("test")
     classpath = sourceSets["test"].runtimeClasspath + sourceSets["test"].output + sourceSets["it"].resources.sourceDirectories
     mainClass = "software.amazon.smithy.java.server.netty.TestServerJavaCodegenRunner"
-    environment("service", "smithy.java.codegen.server.test#TestService")
-    environment("namespace", "smithy.java.codegen.server.test")
+    environment("service", "com.amazon.hyperloop.streaming#Autoloop")
+    environment("namespace", "com.amazon.hyperloop.streaming")
     environment("output", generatedSrcDir)
 }
 

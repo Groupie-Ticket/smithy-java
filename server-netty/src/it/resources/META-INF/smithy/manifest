@@ -1,1 +1,7 @@
-main.smithy
+model/main.smithy
+model/validators.smithy
+model/exceptions.smithy
+model/hvde/cloud-events.smithy
+model/hvde/datatypes.smithy
+model/hvde/edge-events.smithy
+model/hvde/hvde.smithy
