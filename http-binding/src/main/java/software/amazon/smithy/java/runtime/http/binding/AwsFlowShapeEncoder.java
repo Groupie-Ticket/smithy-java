@@ -76,7 +76,7 @@ public final class AwsFlowShapeEncoder<T extends SerializableStruct> implements 
             headers.put(":message-type", HeaderValue.fromString("exception"));
             headers.put(
                 ":exception-type",
-                HeaderValue.fromString(me.getShapeId().getName())
+                HeaderValue.fromString(exceptionSchema.memberName())
             );
             headers.put(":content-type", HeaderValue.fromString("application/json"));
             var os = new ByteArrayOutputStream();
