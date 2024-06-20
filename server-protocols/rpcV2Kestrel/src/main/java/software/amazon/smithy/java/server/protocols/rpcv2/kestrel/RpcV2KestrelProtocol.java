@@ -196,6 +196,7 @@ final class RpcV2KestrelProtocol extends ServerProtocol {
                     downstream.onNext(sigv4Frame.getChunk());
                 } else {
                     done = true;
+                    downstream.onComplete();
                     onComplete();
                 }
             } catch (Throwable t) {
@@ -215,10 +216,8 @@ final class RpcV2KestrelProtocol extends ServerProtocol {
             if (!done) {
                 // TODO: translate error
                 onError(new RuntimeException("Final chunk was never received"));
-            } else {
-                downstream.onComplete();
-                downstream = null;
             }
+            downstream = null;
         }
     }
 
