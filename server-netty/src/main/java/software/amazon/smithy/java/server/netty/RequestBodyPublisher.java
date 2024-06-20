@@ -5,17 +5,21 @@
 
 package software.amazon.smithy.java.server.netty;
 
-import static java.lang.String.format;
-
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Flow;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
+
+import static java.lang.String.format;
 
 final class RequestBodyPublisher implements Flow.Publisher<ByteBuffer> {
     //Guards the requestBodySubscriber;
@@ -24,12 +28,16 @@ final class RequestBodyPublisher implements Flow.Publisher<ByteBuffer> {
     private final Executor downstreamExecutor;
     private final Duration maxSwallowDuration;
     private final Supplier<Instant> clock = Instant::now;
+    private final BlockingQueue<Object> queue = new LinkedBlockingQueue<>();
+    private final AtomicInteger pendingWrites = new AtomicInteger();
     private long pendingReads = 0;
     private Instant swallowStart;
     private Flow.Subscriber<? super ByteBuffer> requestBodySubscriber;
     private boolean closed;
     private boolean readRequested = false;
     private Throwable closedException;
+
+    private record Complete(ByteBuffer buf) {}
 
     RequestBodyPublisher(Channel channel, Executor downstreamExecutor) {
         this.channel = channel;
@@ -122,8 +130,12 @@ final class RequestBodyPublisher implements Flow.Publisher<ByteBuffer> {
             } else {
                 byte[] copy = new byte[buf.readableBytes()];
                 buf.readBytes(copy);
+                queue.add(ByteBuffer.wrap(copy));
                 var sub = requestBodySubscriber;
-                downstreamExecutor.execute(() -> sub.onNext(ByteBuffer.wrap(copy)));
+                if (pendingWrites.getAndIncrement() == 0) {
+                    // sub is only safe to access under the lock, so pass it in
+                    downstreamExecutor.execute(() -> flushWrites(sub));
+                }
             }
             if (swallowStart != null && !maxSwallowDuration.isNegative() && !maxSwallowDuration.isZero() &&
                 clock.get().isAfter(swallowStart.plus(maxSwallowDuration))) {
@@ -133,6 +145,32 @@ final class RequestBodyPublisher implements Flow.Publisher<ByteBuffer> {
                 readRequested = true;
                 pendingReads--;
                 channel.eventLoop().submit(channel::read);
+            }
+        }
+    }
+
+    private void flushWrites(Flow.Subscriber<? super ByteBuffer> sub) {
+        int toWrite = pendingWrites.get();
+        while (toWrite > 0) {
+            int written = 0;
+            try {
+                for (int i = 0; i < toWrite; i++) {
+                    var event = queue.poll();
+                    if (event == null) {
+                        // should never happen
+                        System.err.println("!!! we got a null poll!");
+                        break;
+                    }
+                    written--;
+                    if (event instanceof ByteBuffer buf) {
+                        sub.onNext(buf);
+                    } else {
+                        sub.onNext(((Complete) event).buf);
+                        sub.onComplete();
+                    }
+                }
+            } finally {
+                toWrite = pendingWrites.addAndGet(written);
             }
         }
     }
@@ -147,10 +185,10 @@ final class RequestBodyPublisher implements Flow.Publisher<ByteBuffer> {
                 this.requestBodySubscriber = null;
                 byte[] copy = new byte[buf.readableBytes()];
                 buf.readBytes(copy);
-                downstreamExecutor.execute(() -> {
-                    sub.onNext(ByteBuffer.wrap(copy));
-                    sub.onComplete();
-                });
+                queue.add(new Complete(ByteBuffer.wrap(copy)));
+                if (pendingWrites.getAndIncrement() == 0) {
+                    downstreamExecutor.execute(() -> flushWrites(sub));
+                }
             }
         }
     }
