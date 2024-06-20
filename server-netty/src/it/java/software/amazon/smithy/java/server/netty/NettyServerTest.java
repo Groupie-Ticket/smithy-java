@@ -5,17 +5,9 @@
 
 package software.amazon.smithy.java.server.netty;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.URI;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Flow;
-import java.util.concurrent.SubmissionPublisher;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.zip.GZIPOutputStream;
+import io.reactivex.rxjava3.core.Flowable;
+import io.reactivex.rxjava3.core.Notification;
+import io.reactivex.rxjava3.schedulers.Schedulers;
 import org.junit.jupiter.api.Test;
 import smithy.java.codegen.server.test.model.Beer;
 import smithy.java.codegen.server.test.model.BuzzEvent;
@@ -44,6 +36,21 @@ import smithy.java.codegen.server.test.service.ZipFileOperation;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.server.RequestContext;
 import software.amazon.smithy.java.server.Server;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URI;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Flow;
+import java.util.zip.GZIPOutputStream;
+
+import static org.reactivestreams.FlowAdapters.toFlowPublisher;
+import static org.reactivestreams.FlowAdapters.toPublisher;
 
 class NettyServerTest {
 
@@ -119,51 +126,52 @@ class NettyServerTest {
 
         @Override
         public FizzBuzzOutput fizzBuzz(FizzBuzzInput input, RequestContext context) {
-            FizzBuzzProcessor processor = new FizzBuzzProcessor();
-            input.stream().subscribe(processor);
-            return FizzBuzzOutput.builder().stream(processor).build();
+            return FizzBuzzOutput.builder().stream(getStream(input.stream())).build();
         }
 
-        private static final class FizzBuzzProcessor extends SubmissionPublisher<FizzBuzzStream> implements
-            Flow.Subscriber<ValueStream> {
-            private final AtomicReference<Flow.Subscription> upstream = new AtomicReference<>();
+        private static Flow.Publisher<FizzBuzzStream> getStream(Flow.Publisher<ValueStream> publisher) {
+            return toFlowPublisher(Flowable.fromPublisher(toPublisher(publisher))
+                // This `observeOn` hoists reacting to published messages off of a server thread and into
+                // a reactive scheduler
+                .observeOn(Schedulers.computation())
+                .materialize()
+                .concatMap(FizzBuzz::getFizzyBuzzyFlowable));
+        }
 
-            @Override
-            public void onSubscribe(Flow.Subscription subscription) {
-                if (!upstream.compareAndSet(null, subscription)) {
-                    throw new IllegalStateException("already subscribed");
-                }
-                subscription.request(1);
+        private static Flowable<FizzBuzzStream> getFizzyBuzzyFlowable(Notification<ValueStream> event) {
+            if (event.isOnComplete()) {
+                return Flowable.empty();
+            } else if (event.isOnError()) {
+                return Flowable.error(event.getError());
             }
 
-            @Override
-            public void onNext(ValueStream item) {
-                long value = item.Value().value();
-                if (value < 0) {
-                    onError(NegativeNumberException.builder().message(Long.toString(value)).build());
-                    return;
-                }
-                if (value % 3 == 0) {
-                    submit(FizzBuzzStream.builder().fizz(FizzEvent.builder().value(value).build()).build());
-                }
-                if (value % 5 == 0) {
-                    submit(FizzBuzzStream.builder().buzz(BuzzEvent.builder().value(value).build()).build());
-                }
-                upstream.get().request(1);
+            long value = event.getValue().Value().value();
+            if (value < 0) {
+                return Flowable.error(NegativeNumberException.builder().message(Long.toString(value)).build());
             }
 
-            @Override
-            public void onError(Throwable throwable) {
-                closeExceptionally(throwable);
+            List<FizzBuzzStream> eventsToSend = new ArrayList<>(2);
+            if (value % 3 == 0) {
+                eventsToSend.add(FizzBuzzStream.builder()
+                    .fizz(FizzEvent.builder()
+                        .value(value)
+                        .build())
+                    .build());
             }
 
-            @Override
-            public void onComplete() {
-                super.close();
+            if (value % 5 == 0) {
+                eventsToSend.add(FizzBuzzStream.builder()
+                    .buzz(BuzzEvent.builder()
+                        .value(value)
+                        .build())
+                    .build());
             }
+
+            // This `observeOn` ensures that flowables produced by `getFizzyBuzzyFlowable` are all observed
+            // on a reactive scheduler thread instead of a server thread
+            return Flowable.fromIterable(eventsToSend).observeOn(Schedulers.computation());
         }
     }
-
 
     @Test
     void testServer() {

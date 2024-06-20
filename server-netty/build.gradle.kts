@@ -24,6 +24,8 @@ dependencies {
     testImplementation(project(":codegen::kestrel"))
     testImplementation(project(":kestrel"))
     testImplementation(project(":kestrel-codec"))
+    implementation("io.reactivex.rxjava3:rxjava:3.+")
+    implementation("org.reactivestreams:reactive-streams-flow-adapters:1.+")
     implementation(libs.smithy.codegen)
 }
 
