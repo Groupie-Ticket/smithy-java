@@ -38,6 +38,7 @@ public final class AwsFlowShapeEncoder<T extends SerializableStruct> implements 
         this.possibleExceptions = eventSchema.members()
             .stream()
             .filter(s -> s.hasTrait(ErrorTrait.class))
+            .map(Schema::memberTarget)
             .collect(Collectors.toMap(Schema::id, Function.identity()));
     }
 
@@ -46,7 +47,6 @@ public final class AwsFlowShapeEncoder<T extends SerializableStruct> implements 
         var os = new ByteArrayOutputStream();
         var typeHolder = new AtomicReference<String>();
         try (var baseSerializer = codec.createSerializer(os)) {
-            var possibleTypes = eventSchema.members().stream().map(Schema::memberName).collect(Collectors.toSet());
 
             item.serializeMembers(new SpecificShapeSerializer() {
                 @Override
