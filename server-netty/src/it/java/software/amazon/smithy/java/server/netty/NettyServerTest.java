@@ -131,7 +131,7 @@ class NettyServerTest {
             @Override
             public void onSubscribe(Flow.Subscription subscription) {
                 if (!upstream.compareAndSet(null, subscription)) {
-                    throw new IllegalStateException();
+                    throw new IllegalStateException("already subscribed");
                 }
                 subscription.request(1);
             }

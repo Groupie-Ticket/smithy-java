@@ -324,7 +324,25 @@ final class RpcV2KestrelProtocol extends ServerProtocol {
 
         @Override
         public void onError(Throwable t) {
-            downstream.onError(t);
+            if (t instanceof SerializableStruct s) {
+                byte[] serialized;
+                try {
+                    serialized = codec.encodeEventException(s);
+                } catch (Exception e) {
+                    downstream.onError(t);
+                    return;
+                }
+                if (serialized == null) {
+                    // not an event for this stream
+                    downstream.onError(t);
+                    return;
+                } else {
+                    downstream.onNext(ByteBuffer.wrap(serialized));
+                    downstream.onComplete();
+                }
+            } else {
+                downstream.onError(t);
+            }
         }
 
         @Override

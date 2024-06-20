@@ -30,7 +30,9 @@ import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.model.traits.ErrorTrait;
 import software.amazon.smithy.model.traits.StreamingTrait;
+import software.amazon.smithy.utils.StringUtils;
 
 public class KestrelCodecFactoryGenerator implements Consumer<JavaWriter> {
 
@@ -234,15 +236,19 @@ public class KestrelCodecFactoryGenerator implements Consumer<JavaWriter> {
                     .toList();
                 writer.pushState();
                 writer.putContext("errorMatcher", writer.consumer(w -> {
+                    boolean first = true;
                     for (var error : errors) {
                         var smithySymbol = error.expectProperty(SMITHY_SYMBOL);
-                        writer.putContext("kestrelError", error);
-                        writer.putContext("smithyError", smithySymbol);
+                        w.putContext("kestrelError", error);
+                        w.putContext("smithyError", smithySymbol);
+                        w.putContext("conditional", first ? "if" : "} else if");
+                        first = false;
                         w.write("""
-                            if (exception instanceof ${smithyError:T} e) {
-                                return ${kestrelError:T}.convertFrom(e);
-                            }
-                            """);
+                            ${conditional:L} (exception instanceof ${smithyError:T} e) {
+                                return ${kestrelError:T}.convertFrom(e);""");
+                    }
+                    if (!first) {
+                        w.write("}\n");
                     }
                 }));
                 var template = """
@@ -321,11 +327,51 @@ public class KestrelCodecFactoryGenerator implements Consumer<JavaWriter> {
             var smithySymbol = kestrelType.expectProperty(SMITHY_SYMBOL);
             writer.putContext("smithySymbol", smithySymbol);
             writer.putContext("kestrelSymbol", kestrelType);
+            var exceptions = target.getAllMembers()
+                .entrySet()
+                .stream()
+                .filter(member -> {
+                    var memberTarget = model.expectShape(member.getValue().getTarget());
+                    return memberTarget.hasTrait(ErrorTrait.class);
+                })
+                .toList();
+            if (!exceptions.isEmpty()) {
+                writer.putContext("exceptions", writer.consumer(w -> {
+                    boolean first = true;
+                    for (var e : exceptions) {
+                        var errorTarget = model.expectShape(e.getValue().getTarget());
+                        var kestrelError = symbolProvider.toSymbol(errorTarget);
+                        var smithyError = symbolProvider.toSymbol(errorTarget).expectProperty(SMITHY_SYMBOL);
+                        w.putContext("kestrelError", kestrelError);
+                        w.putContext("smithyError", smithyError);
+                        w.putContext("conditional", first ? "if" : "} else if");
+                        w.putContext("kestrelSetter", StringUtils.capitalize(e.getKey()));
+                        first = false;
+                        w.write("""
+                            ${conditional:L} (exception instanceof ${smithyError:T} e) {
+                                conv.set${kestrelSetter:L}(${kestrelError:T}.convertFrom(e));
+                                unset = false;""");
+                    }
+                    w.write("}\n");
+                }));
+            }
             writer.write("""
 
                 @Override
                 public byte[] encodeEvent(${serializableStruct:T} event) {
                     return serialize(${kestrelSymbol:T}.convertFrom((${smithySymbol:T}) event));
+                }
+
+                @Override
+                public byte[] encodeEventException(${serializableStruct:T} exception) {
+                    ${^exceptions}return null;${/exceptions}${?exceptions}boolean unset = true;
+                    ${kestrelSymbol:T} conv = new ${kestrelSymbol:T}();
+                    ${exceptions:C|}
+                    if (unset) {
+                        return null;
+                    } else {
+                        return serialize(conv);
+                    }${/exceptions}
                 }""");
             writer.popState();
         }
