@@ -11,11 +11,9 @@ import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.java.server.exceptions.UnknownOperationException;
 import software.amazon.smithy.model.shapes.ShapeId;
-import software.amazon.smithy.utils.Pair;
 
 public final class ProtocolResolver {
 
@@ -37,11 +35,11 @@ public final class ProtocolResolver {
             .toList();
     }
 
-    public Pair<Operation<?, ?>, ServerProtocol> resolveOperation(ResolutionRequest request) {
+    public ResolutionResult resolveOperation(ResolutionRequest request) {
         for (ServerProtocol serverProtocolHandler : serverProtocolHandlers) {
-            var operation = serverProtocolHandler.resolveOperation(request);
-            if (operation != null) {
-                return Pair.of(operation, serverProtocolHandler);
+            var result = serverProtocolHandler.resolveOperation(request);
+            if (result != null) {
+                return result;
             }
         }
         throw new UnknownOperationException("Unable to resolve operation");

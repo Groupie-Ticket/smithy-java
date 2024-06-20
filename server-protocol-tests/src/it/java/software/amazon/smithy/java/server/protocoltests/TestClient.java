@@ -35,7 +35,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.stream.Collectors;
 
 final class TestClient {
 
@@ -70,7 +69,7 @@ final class TestClient {
         if (request.queryParams() == null || request.queryParams().isEmpty()) {
             queryParams = null;
         } else {
-            queryParams = "?" + request.queryParams().stream().collect(Collectors.joining("&"));
+            queryParams = String.join("&", request.queryParams());
         }
         ByteBuf body = request.body()
             .map(b -> Unpooled.wrappedBuffer(b.getBytes(StandardCharsets.UTF_8)))
@@ -85,9 +84,9 @@ final class TestClient {
                     endpoint.getHost(),
                     endpoint.getPort(),
                     path,
-                    queryParams,
+                    null,
                     null
-                ).toString(),
+                ) + (queryParams == null ? "" : "?" + queryParams),
                 body
             );
             if (body.readableBytes() > 0) {

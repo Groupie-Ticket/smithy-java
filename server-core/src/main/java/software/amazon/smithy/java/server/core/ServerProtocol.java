@@ -7,11 +7,13 @@ package software.amazon.smithy.java.server.core;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import software.amazon.smithy.java.runtime.core.Context;
 import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.model.shapes.ShapeId;
 
 public abstract class ServerProtocol {
+    public static final Context.Key<Context> PROTOCOL_CONTEXT = Context.key("protocol-context");
 
     private final List<Operation<?, ?>> operations;
     private final Service service;
@@ -29,7 +31,7 @@ public abstract class ServerProtocol {
      * @param
      * @return
      */
-    public abstract Operation<?, ?> resolveOperation(ResolutionRequest request);
+    public abstract ResolutionResult resolveOperation(ResolutionRequest request);
 
     public abstract CompletableFuture<Void> deserializeInput(Job job);
 

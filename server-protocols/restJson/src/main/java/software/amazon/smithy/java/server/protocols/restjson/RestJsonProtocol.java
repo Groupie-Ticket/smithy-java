@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import software.amazon.smithy.java.runtime.core.Context;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.InputEventStreamingSdkOperation;
 import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
@@ -38,6 +39,7 @@ import software.amazon.smithy.java.server.core.ByteValue;
 import software.amazon.smithy.java.server.core.Job;
 import software.amazon.smithy.java.server.core.ReactiveByteValue;
 import software.amazon.smithy.java.server.core.ResolutionRequest;
+import software.amazon.smithy.java.server.core.ResolutionResult;
 import software.amazon.smithy.java.server.core.ServerProtocol;
 import software.amazon.smithy.java.server.core.ShapeValue;
 import software.amazon.smithy.java.server.core.Value;
@@ -53,6 +55,7 @@ import software.amazon.smithy.model.traits.HttpErrorTrait;
 import software.amazon.smithy.model.traits.HttpTrait;
 
 public final class RestJsonProtocol extends ServerProtocol {
+    private static final Context.Key<ValuedMatch<Operation<?, ?>>> MATCH_KEY = Context.key("restjson-match");
 
     private final UriMatcherMap<Operation<?, ?>> matcher;
     private final Codec codec;
@@ -82,10 +85,17 @@ public final class RestJsonProtocol extends ServerProtocol {
     }
 
     @Override
-    public Operation<?, ?> resolveOperation(ResolutionRequest request) {
-        ValuedMatch<Operation<?, ?>> selectedOperation = matcher.match(request.uri().getPath());
+    public ResolutionResult resolveOperation(ResolutionRequest request) {
+        var uri = request.uri().getPath();
+        String rawQuery = request.uri().getRawQuery();
+        if (rawQuery != null) {
+            uri += "?" + rawQuery;
+        }
+        ValuedMatch<Operation<?, ?>> selectedOperation = matcher.match(uri);
         if (selectedOperation != null) {
-            return selectedOperation.getValue();
+            Context ctx = Context.create();
+            ctx.put(MATCH_KEY, selectedOperation);
+            return new ResolutionResult(selectedOperation.getValue(), this, ctx);
         }
 
         return null;
@@ -93,17 +103,10 @@ public final class RestJsonProtocol extends ServerProtocol {
 
     @Override
     public CompletableFuture<Void> deserializeInput(Job job) {
-
         ShapeBuilder<? extends SerializableStruct> shapeBuilder = job.operation().getApiOperation().inputBuilder();
 
         // todo - store the path match result
-        ValuedMatch<Operation<?, ?>> selectedOperation = matcher.match(
-            job.request().getContext().get(HttpAttributes.HTTP_URI).getPath()
-        );
-
-        if (selectedOperation.getValue() != job.operation()) {
-            throw new IllegalStateException();
-        }
+        ValuedMatch<Operation<?, ?>> selectedOperation = job.context().get(PROTOCOL_CONTEXT).get(MATCH_KEY);
 
         Map<String, String> labelValues = new HashMap<>();
         var encoder = new UrlEncoder();

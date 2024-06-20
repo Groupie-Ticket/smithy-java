@@ -36,7 +36,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicReference;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
-import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.core.ByteValue;
 import software.amazon.smithy.java.server.core.Job;
 import software.amazon.smithy.java.server.core.JobImpl;
@@ -48,12 +47,12 @@ import software.amazon.smithy.java.server.core.ReplyImpl;
 import software.amazon.smithy.java.server.core.Request;
 import software.amazon.smithy.java.server.core.RequestImpl;
 import software.amazon.smithy.java.server.core.ResolutionRequest;
+import software.amazon.smithy.java.server.core.ResolutionResult;
 import software.amazon.smithy.java.server.core.ServerProtocol;
 import software.amazon.smithy.java.server.core.Value;
 import software.amazon.smithy.java.server.core.attributes.HttpAttributes;
 import software.amazon.smithy.java.server.core.http.HttpMethod;
 import software.amazon.smithy.java.server.exceptions.UnknownOperationException;
-import software.amazon.smithy.utils.Pair;
 
 final class NettyHandler extends ChannelDuplexHandler {
 
@@ -78,9 +77,9 @@ final class NettyHandler extends ChannelDuplexHandler {
             HttpHeaders headers = getHeaders(httpRequest);
             HttpMethod method = HttpMethod.valueOf(httpRequest.method().name());
 
-            Pair<Operation<?, ?>, ServerProtocol> operationProtocolPair;
+            ResolutionResult resolutionResult;
             try {
-                operationProtocolPair = protocolResolver.resolveOperation(
+                resolutionResult = protocolResolver.resolveOperation(
                     new ResolutionRequest(method, uri, headers)
                 );
             } catch (UnknownOperationException e) {
@@ -93,13 +92,22 @@ final class NettyHandler extends ChannelDuplexHandler {
                 channel.close();
                 return;
             }
-            operation = operationProtocolPair.left.getApiOperation();
+            operation = resolutionResult.operation().getApiOperation();
             Request request = createRequest(httpRequest);
             request.getContext().put(HttpAttributes.HTTP_HEADERS, headers);
             request.getContext().put(HttpAttributes.HTTP_URI, uri);
             request.getContext().put(HttpAttributes.HTTP_METHOD, method.getName());
 
-            job = new JobImpl(request, new ReplyImpl(), operationProtocolPair.left, operationProtocolPair.right);
+            job = new JobImpl(
+                request,
+                new ReplyImpl(),
+                resolutionResult.operation(),
+                resolutionResult.protocol()
+            );
+
+            if (resolutionResult.resolutionContext() != null) {
+                job.context().put(ServerProtocol.PROTOCOL_CONTEXT, resolutionResult.resolutionContext());
+            }
 
             if (httpRequest instanceof FullHttpRequest) {
                 writeResponse(channel, orchestrator.enqueue(job));
@@ -110,7 +118,7 @@ final class NettyHandler extends ChannelDuplexHandler {
             // If we have an HttpRequest but not an FullHttpRequest
             // we need to read a series of 0 or more HttpContents followed by an HttpLastContent
 
-            if (operationProtocolPair.left.getApiOperation().streamingInput()) {
+            if (operation.streamingInput()) {
                 channel.config().setAutoRead(false);
                 bodyPublisher = new RequestBodyPublisher(channel, orchestrator);
                 request.setValue(new ReactiveByteValue(bodyPublisher));

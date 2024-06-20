@@ -44,6 +44,7 @@ public final class RequestDeserializer {
     public RequestDeserializer request(SmithyHttpRequest request) {
         DataStream bodyDataStream = bodyDataStream(request);
         deserBuilder.headers(request.headers())
+            .requestRawQueryString(request.uri().getRawQuery())
             .body(bodyDataStream)
             .shapeBuilder(inputShapeBuilder);
         return this;
