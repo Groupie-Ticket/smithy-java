@@ -67,6 +67,10 @@ public abstract class KestrelCodec {
         throw new UnsupportedOperationException(this + " does not serialize events");
     }
 
+    public byte[] encodeEventException(SerializableStruct input) {
+        throw new UnsupportedOperationException(this + " does not serialize events");
+    }
+
     public Flow.Publisher<? extends SerializableStruct> getStreamMember(SerializableStruct input) {
         throw new UnsupportedOperationException(this + " does not have an event streaming response");
     }

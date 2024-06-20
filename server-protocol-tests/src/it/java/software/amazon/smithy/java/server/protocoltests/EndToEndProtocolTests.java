@@ -491,7 +491,7 @@ public class EndToEndProtocolTests {
                     }
                 }
                 if (f.getType() == float.class ||
-                        f.getType() == Float.class) {
+                    f.getType() == Float.class) {
                     f.setAccessible(true);
                     Float fVal = (Float) f.get(obj);
                     if (fVal != null && fVal.isNaN()) {
@@ -514,8 +514,10 @@ public class EndToEndProtocolTests {
             for (Map.Entry<StringNode, Node> member : ((ObjectNode) n).getMembers().entrySet()) {
                 if (member.getValue().isNumberNode()) {
                     if (member.getValue().expectNumberNode().isNaN()) {
-                        builder.withMember(member.getKey(),
-                                new NumberNode(DNAN_STANDIN, member.getValue().getSourceLocation()));
+                        builder.withMember(
+                            member.getKey(),
+                            new NumberNode(DNAN_STANDIN, member.getValue().getSourceLocation())
+                        );
                     } else {
                         builder.withMember(member.getKey(), member.getValue());
                     }
