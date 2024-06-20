@@ -131,9 +131,6 @@ class NettyServerTest {
 
         private static Flow.Publisher<FizzBuzzStream> getStream(Flow.Publisher<ValueStream> publisher) {
             return toFlowPublisher(Flowable.fromPublisher(toPublisher(publisher))
-                // This `observeOn` hoists reacting to published messages off of a server thread and into
-                // a reactive scheduler
-                .observeOn(Schedulers.computation())
                 .materialize()
                 .concatMap(FizzBuzz::getFizzyBuzzyFlowable));
         }
@@ -167,9 +164,7 @@ class NettyServerTest {
                     .build());
             }
 
-            // This `observeOn` ensures that flowables produced by `getFizzyBuzzyFlowable` are all observed
-            // on a reactive scheduler thread instead of a server thread
-            return Flowable.fromIterable(eventsToSend).observeOn(Schedulers.computation());
+            return Flowable.fromIterable(eventsToSend);
         }
     }
 
