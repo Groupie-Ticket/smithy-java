@@ -38,8 +38,7 @@ public final class AwsFlowShapeEncoder<T extends SerializableStruct> implements 
         this.possibleExceptions = eventSchema.members()
             .stream()
             .filter(s -> s.hasTrait(ErrorTrait.class))
-            .map(Schema::memberTarget)
-            .collect(Collectors.toMap(Schema::id, Function.identity()));
+            .collect(Collectors.toMap(s -> s.memberTarget().id(), Function.identity()));
     }
 
     @Override
@@ -47,6 +46,7 @@ public final class AwsFlowShapeEncoder<T extends SerializableStruct> implements 
         var os = new ByteArrayOutputStream();
         var typeHolder = new AtomicReference<String>();
         try (var baseSerializer = codec.createSerializer(os)) {
+            var possibleTypes = eventSchema.members().stream().map(Schema::memberName).collect(Collectors.toSet());
 
             item.serializeMembers(new SpecificShapeSerializer() {
                 @Override
@@ -70,13 +70,15 @@ public final class AwsFlowShapeEncoder<T extends SerializableStruct> implements 
     public AwsFlowFrame encodeFailure(Throwable exception) {
 
         AwsFlowFrame frame;
-        if (exception instanceof ModeledApiException me && possibleExceptions.containsKey(me.getShapeId())) {
+        Schema exceptionSchema;
+        if (exception instanceof ModeledApiException me && (exceptionSchema = possibleExceptions.get(me.getShapeId())) != null) {
             var headers = new HashMap<String, HeaderValue>();
             headers.put(":message-type", HeaderValue.fromString("exception"));
             headers.put(
                 ":exception-type",
-                HeaderValue.fromString(possibleExceptions.get(me.getShapeId()).memberName())
+                HeaderValue.fromString(me.getShapeId().getName())
             );
+            headers.put(":content-type", HeaderValue.fromString("application/json"));
             var os = new ByteArrayOutputStream();
             try (var serializer = codec.createSerializer(os)) {
                 me.serialize(serializer);
