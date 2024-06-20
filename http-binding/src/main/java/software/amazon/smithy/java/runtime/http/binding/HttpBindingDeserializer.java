@@ -7,6 +7,7 @@ package software.amazon.smithy.java.runtime.http.binding;
 
 import java.net.http.HttpHeaders;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -19,7 +20,9 @@ import software.amazon.smithy.java.runtime.core.serde.EventStreamFrameDecodingPr
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeDeserializer;
+import software.amazon.smithy.java.runtime.core.uri.QueryStringParser;
 import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.model.traits.HttpQueryTrait;
 import software.amazon.smithy.utils.SmithyBuilder;
 
 /**
@@ -34,7 +37,7 @@ public final class HttpBindingDeserializer extends SpecificShapeDeserializer imp
     private static final System.Logger LOGGER = System.getLogger(HttpBindingDeserializer.class.getName());
     private final Codec payloadCodec;
     private final HttpHeaders headers;
-    private final String requestRawQueryString;
+    private final Map<String, List<String>> queryStringParameters;
     private final int responseStatus;
     private final String requestPath;
     private final Map<String, String> requestPathLabels;
@@ -52,7 +55,7 @@ public final class HttpBindingDeserializer extends SpecificShapeDeserializer imp
         this.eventDecoder = builder.eventDecoder;
         this.body = builder.body == null ? DataStream.ofEmpty() : builder.body;
         this.requestPath = builder.requestPath;
-        this.requestRawQueryString = builder.requestRawQueryString;
+        this.queryStringParameters = QueryStringParser.parse(builder.requestRawQueryString);
         this.responseStatus = builder.responseStatus;
         this.requestPathLabels = builder.requestPathLabels;
     }
@@ -78,7 +81,14 @@ public final class HttpBindingDeserializer extends SpecificShapeDeserializer imp
                     member,
                     new HttpPathLabelDeserializer(requestPathLabels.get(member.memberName()))
                 );
-                case QUERY -> throw new UnsupportedOperationException("httpQuery binding not supported yet");
+                case QUERY -> {
+                    var paramValue = queryStringParameters.get(member.expectTrait(HttpQueryTrait.class).getValue());
+                    if (paramValue != null) {
+                        structMemberConsumer.accept(state, member, new HttpQueryStringDeserializer(paramValue));
+                    }
+                }
+                case QUERY_PARAMS ->
+                    structMemberConsumer.accept(state, member, new HttpQueryParamsDeserializer(queryStringParameters));
                 case HEADER -> {
                     if (member.type() == ShapeType.LIST) {
                         var allValues = headers.allValues(bindingMatcher.header());
@@ -119,7 +129,7 @@ public final class HttpBindingDeserializer extends SpecificShapeDeserializer imp
                         shapeBuilder.setEventStream(stream);
                     }
                 }
-                default -> throw new UnsupportedOperationException("not supported yet");
+                default -> throw new UnsupportedOperationException(bindingMatcher.match(member) + "not supported yet");
             }
         }
 
@@ -236,7 +246,7 @@ public final class HttpBindingDeserializer extends SpecificShapeDeserializer imp
         /**
          * Set the raw query string of the request.
          *
-         * <p>The query string should be percent-encoded and include any relevant parameters.
+        `        * <p>The query string should be percent-encoded and include any relevant parameters.
          * For example, "foo=bar&baz=bam%20boo".
          *
          * @param requestRawQueryString Query string.

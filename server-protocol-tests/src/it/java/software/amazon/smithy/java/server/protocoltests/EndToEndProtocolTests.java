@@ -7,6 +7,7 @@ package software.amazon.smithy.java.server.protocoltests;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import aws.protocoltests.restjson.model.OmitsSerializingEmptyListsInput;
 import aws.protocoltests.restjson.model.PayloadConfig;
 import aws.protocoltests.restjson.model.TestPayloadStructureInput;
 import io.netty.buffer.Unpooled;
@@ -82,7 +83,12 @@ public class EndToEndProtocolTests {
         // Weird one: httpPayload binging moves this test's "{}" to apply to payloadConfig, but the
         // document-based assertion is just an empty structure
         "RestJsonHttpWithEmptyStructurePayload",
-        TestPayloadStructureInput.builder().payloadConfig(PayloadConfig.builder().build()).build()
+        TestPayloadStructureInput.builder().payloadConfig(PayloadConfig.builder().build()).build(),
+
+        // Query parameter protocol tests generally leave off values for unspecified query string parameters
+        // but not this one, which insists that they be deserialized as empty lists
+        "RestJsonOmitsEmptyListQueryValues",
+        OmitsSerializingEmptyListsInput.builder().build()
     );
 
     private record TestOperation(

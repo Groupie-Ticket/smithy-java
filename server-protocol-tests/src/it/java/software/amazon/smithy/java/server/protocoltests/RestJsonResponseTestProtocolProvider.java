@@ -6,10 +6,10 @@
 package software.amazon.smithy.java.server.protocoltests;
 
 import java.util.concurrent.CompletableFuture;
-import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.java.server.core.Job;
 import software.amazon.smithy.java.server.core.ResolutionRequest;
+import software.amazon.smithy.java.server.core.ResolutionResult;
 import software.amazon.smithy.java.server.core.ServerProtocol;
 import software.amazon.smithy.java.server.core.ServerProtocolProvider;
 import software.amazon.smithy.java.server.core.ShapeValue;
@@ -50,7 +50,7 @@ public class RestJsonResponseTestProtocolProvider implements
         }
 
         @Override
-        public Operation<?, ?> resolveOperation(ResolutionRequest request) {
+        public ResolutionResult resolveOperation(ResolutionRequest request) {
             ShapeId serviceId = request.headers()
                 .firstValue("x-protocol-test-service")
                 .map(ShapeId::from)
@@ -64,10 +64,16 @@ public class RestJsonResponseTestProtocolProvider implements
                 return null;
             }
 
-            return getOperations().stream()
+            var op = getOperations().stream()
                 .filter(operation -> operation.getApiOperation().schema().id().equals(operationId))
                 .findFirst()
                 .orElse(null);
+
+            if (op == null) {
+                return null;
+            }
+
+            return new ResolutionResult(op, this, null);
         }
 
         @Override

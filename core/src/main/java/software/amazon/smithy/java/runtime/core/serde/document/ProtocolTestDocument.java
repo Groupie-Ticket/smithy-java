@@ -321,5 +321,13 @@ public final class ProtocolTestDocument implements Document {
         public boolean isNull() {
             return jsonDocument.node.isNullNode();
         }
+
+        @Override
+        public <T> T readNull() {
+            if (!jsonDocument.node.isNullNode()) {
+                throw new SerializationException("Attempted to read non-null value as null");
+            }
+            return null;
+        }
     }
 }

@@ -25,12 +25,12 @@ import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
-import software.amazon.smithy.java.server.Operation;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.java.server.core.ByteValue;
 import software.amazon.smithy.java.server.core.Job;
 import software.amazon.smithy.java.server.core.ReactiveByteValue;
 import software.amazon.smithy.java.server.core.ResolutionRequest;
+import software.amazon.smithy.java.server.core.ResolutionResult;
 import software.amazon.smithy.java.server.core.ServerProtocol;
 import software.amazon.smithy.java.server.core.ShapeValue;
 import software.amazon.smithy.java.server.core.Value;
@@ -59,7 +59,7 @@ final class RpcV2KestrelProtocol extends ServerProtocol {
     }
 
     @Override
-    public Operation<?, ?> resolveOperation(ResolutionRequest request) {
+    public ResolutionResult resolveOperation(ResolutionRequest request) {
         if (!HttpMethod.POST.equals(request.method())) {
             return null;
         }
@@ -74,7 +74,11 @@ final class RpcV2KestrelProtocol extends ServerProtocol {
             return null;
         }
         Pair<String, String> serviceOperation = RpcV2PathParser.parseRpcV2Path(request.uri().getPath());
-        return getService().getOperation(serviceOperation.right);
+        return new ResolutionResult(
+            getService().getOperation(serviceOperation.right),
+            this,
+            null
+        );
     }
 
     @Override

@@ -5,9 +5,10 @@
 
 package software.amazon.smithy.java.server.netty;
 
+import static java.lang.String.format;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
-
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
@@ -18,8 +19,6 @@ import java.util.concurrent.Flow;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
-
-import static java.lang.String.format;
 
 final class RequestBodyPublisher implements Flow.Publisher<ByteBuffer> {
     //Guards the requestBodySubscriber;
