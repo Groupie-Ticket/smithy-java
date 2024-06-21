@@ -200,6 +200,9 @@ final class RpcV2KestrelProtocol extends ServerProtocol {
                     downstream.onNext(sigv4Frame.getChunk());
                 } else {
                     done = true;
+                    // since there's nothing left to forward downstream, we have to explicitly request
+                    // the completion notification from the request publisher
+                    upstreamSubscription.request(1);
                 }
             } catch (Throwable t) {
                 // TODO: translate error

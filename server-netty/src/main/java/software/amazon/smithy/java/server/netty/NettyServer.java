@@ -14,13 +14,12 @@ import io.netty.channel.epoll.EpollServerSocketChannel;
 import io.netty.channel.kqueue.KQueue;
 import io.netty.channel.kqueue.KQueueEventLoopGroup;
 import io.netty.channel.kqueue.KQueueServerSocketChannel;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.util.List;
 import java.util.function.Consumer;
-
-import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.nio.NioServerSocketChannel;
 import software.amazon.smithy.java.server.Server;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.java.server.core.DefaultOrchestratorImpl;
