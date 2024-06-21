@@ -103,6 +103,8 @@ public final class HttpBindingDeserializer extends SpecificShapeDeserializer imp
                         }
                     }
                 }
+                case PREFIX_HEADERS ->
+                    structMemberConsumer.accept(state, member, new HttpPrefixHeadersDeserializer(headers));
                 case BODY -> bodyMembers.add(member.memberName());
                 case PAYLOAD -> {
                     if (member.memberTarget().type() == ShapeType.STRUCTURE) {

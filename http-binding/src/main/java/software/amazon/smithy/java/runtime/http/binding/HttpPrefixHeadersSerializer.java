@@ -39,6 +39,9 @@ final class HttpPrefixHeadersSerializer extends SpecificShapeSerializer {
             K keyState,
             BiConsumer<K, ShapeSerializer> valueSerializer
         ) {
+            if (PrefixConstants.OMITTED_HEADER_NAMES.contains(prefix + key)) {
+                return;
+            }
             valueSerializer.accept(keyState, new SpecificShapeSerializer() {
                 @Override
                 public void writeString(Schema schema, String value) {
