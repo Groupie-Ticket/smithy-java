@@ -5,7 +5,12 @@
 
 package software.amazon.smithy.java.server.core;
 
-import java.util.*;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.List;
+import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
@@ -15,7 +20,7 @@ import software.amazon.smithy.java.server.Service;
 public class DefaultOrchestratorImpl implements Orchestrator {
 
     private final List<Handler> handlers;
-    private final BlockingQueue<Work> queue;
+    private final BlockingQueue<Runnable> queue;
     private final int numberOfWorkers;
 
     public DefaultOrchestratorImpl(Service service, int numberOfWorkers, List<Handler> endpointHandlers) {
@@ -47,28 +52,23 @@ public class DefaultOrchestratorImpl implements Orchestrator {
 
     @Override
     public void execute(Runnable command) {
-        queue.add(new GenericWork(command));
+        queue.add(command);
     }
 
-    private sealed interface Work extends Runnable {}
-
-    private record GenericWork(Runnable command) implements Work {
-
-        @Override
-        public void run() {
-            command.run();
-        }
-    }
-
-    private final class JobWork implements Work {
+    private final class JobWork implements Runnable {
         private final Job job;
         private final Queue<Handler> queue;
-        private final BlockingQueue<Work> workQueue;
+        private final BlockingQueue<Runnable> workQueue;
         private final CompletableFuture<Job> signal;
         private final Deque<Handler> soFar;
         private State state = State.BEFORE;
 
-        private JobWork(Job job, List<Handler> handlers, BlockingQueue<Work> workQueue, CompletableFuture<Job> signal) {
+        private JobWork(
+            Job job,
+            List<Handler> handlers,
+            BlockingQueue<Runnable> workQueue,
+            CompletableFuture<Job> signal
+        ) {
             this.job = job;
             this.queue = new ArrayDeque<>(handlers);
             this.workQueue = workQueue;
@@ -150,22 +150,23 @@ public class DefaultOrchestratorImpl implements Orchestrator {
     }
 
     private static final class ConsumerTask implements Runnable {
-        private final BlockingQueue<Work> workQueue;
+        private final BlockingQueue<Runnable> workQueue;
 
-        private ConsumerTask(BlockingQueue<Work> workQueue) {
+        private ConsumerTask(BlockingQueue<Runnable> workQueue) {
             this.workQueue = workQueue;
         }
-
 
         @Override
         public void run() {
             try {
                 while (true) {
-                    Work work = workQueue.take();
+                    Runnable work = workQueue.take();
                     work.run();
                 }
             } catch (InterruptedException ignored) {
                 Thread.currentThread().interrupt();
+            } catch (Throwable t) {
+                new Throwable("Unhandled exception in orchestrator", t).printStackTrace();
             }
         }
     }
