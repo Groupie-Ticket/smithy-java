@@ -160,9 +160,7 @@ public final class SchemaGenerator extends ShapeVisitor.Default<Void> implements
     }
 
     private void generateStructMemberSchemas(Shape shape) {
-        for (var member : shape.members()) {
-            writeNestedMemberSchema(member);
-        }
+        shape.members().forEach(this::writeNestedMemberSchema);
 
         // Add the member schema names to the context, so we can iterate through them
         writer.putContext(
