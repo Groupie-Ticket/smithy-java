@@ -35,6 +35,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 final class TestClient {
 
@@ -209,7 +211,7 @@ final class TestClient {
             return cf.whenComplete((res, ex) -> {
                 channel.pipeline().remove("resp");
                 channel.close();
-            }).get();
+            }).get(5, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException(e);
@@ -218,6 +220,8 @@ final class TestClient {
                 throw re;
             }
             throw new RuntimeException(e.getCause());
+        } catch (TimeoutException e) {
+            throw new RuntimeException(e);
         }
     }
 

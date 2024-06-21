@@ -88,6 +88,10 @@ final class RequestBodyPublisher implements Flow.Publisher<ByteBuffer> {
                                 s.onError(new IOException("The request body has already finished streaming"));
                                 return;
                             }
+
+                            if (pendingWrites.get() > 0) {
+                                downstreamExecutor.execute(() -> flushWrites(requestBodySubscriber));
+                            }
                         }
 
                         if (closed) {
@@ -124,18 +128,13 @@ final class RequestBodyPublisher implements Flow.Publisher<ByteBuffer> {
     void next(ByteBuf buf) {
         synchronized (requestBodySubscriberLock) {
             readRequested = false;
-            if (requestBodySubscriber == null) {
-                buf.release();
-            } else {
-                byte[] copy = new byte[buf.readableBytes()];
-                buf.readBytes(copy);
-                buf.release();
-                queue.add(ByteBuffer.wrap(copy));
-                var sub = requestBodySubscriber;
-                if (pendingWrites.getAndIncrement() == 0) {
-                    // sub is only safe to access under the lock, so pass it in
-                    downstreamExecutor.execute(() -> flushWrites(sub));
-                }
+            byte[] copy = new byte[buf.readableBytes()];
+            buf.readBytes(copy);
+            buf.release();
+            queue.add(ByteBuffer.wrap(copy));
+            if (pendingWrites.getAndIncrement() == 0 && requestBodySubscriber != null) {
+                // sub is only safe to access under the lock, so pass it in
+                downstreamExecutor.execute(() -> flushWrites(requestBodySubscriber));
             }
             if (swallowStart != null && !maxSwallowDuration.isNegative() && !maxSwallowDuration.isZero() &&
                 clock.get().isAfter(swallowStart.plus(maxSwallowDuration))) {
@@ -165,8 +164,12 @@ final class RequestBodyPublisher implements Flow.Publisher<ByteBuffer> {
                     if (event instanceof ByteBuffer buf) {
                         sub.onNext(buf);
                     } else {
-                        sub.onNext(((Complete) event).buf);
+                        ByteBuffer buf = ((Complete) event).buf;
+                        if (buf.hasRemaining()) {
+                            sub.onNext(buf);
+                        }
                         sub.onComplete();
+                        closed = true;
                     }
                 }
             } finally {
@@ -177,19 +180,12 @@ final class RequestBodyPublisher implements Flow.Publisher<ByteBuffer> {
 
     void complete(ByteBuf buf) {
         synchronized (requestBodySubscriberLock) {
-            closed = true;
-            if (requestBodySubscriber == null) {
-                buf.release();
-            } else {
-                var sub = this.requestBodySubscriber;
-                this.requestBodySubscriber = null;
-                byte[] copy = new byte[buf.readableBytes()];
-                buf.readBytes(copy);
-                buf.release();
-                queue.add(new Complete(ByteBuffer.wrap(copy)));
-                if (pendingWrites.getAndIncrement() == 0) {
-                    downstreamExecutor.execute(() -> flushWrites(sub));
-                }
+            byte[] copy = new byte[buf.readableBytes()];
+            buf.readBytes(copy);
+            buf.release();
+            queue.add(new Complete(ByteBuffer.wrap(copy)));
+            if (pendingWrites.getAndIncrement() == 0 && requestBodySubscriber != null) {
+                downstreamExecutor.execute(() -> flushWrites(requestBodySubscriber));
             }
         }
     }

@@ -42,7 +42,7 @@ final class MockOperation implements BiFunction<Object, RequestContext, Object> 
     @Override
     public Object apply(Object o, RequestContext requestContext) {
         lastOperation = operationId;
-        lastRequest = o;
+        lastRequest = EndToEndProtocolTests.normalize(o);
         return response;
     }
 }

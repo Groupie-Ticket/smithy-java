@@ -51,6 +51,9 @@ public final class RequestDeserializer {
     }
 
     private DataStream bodyDataStream(SmithyHttpRequest request) {
+        if (request.body() instanceof DataStream) {
+            return (DataStream) request.body();
+        }
         var contentType = request.headers().firstValue("content-type").orElse(null);
         var contentLength = request.headers().firstValue("content-length").map(Long::valueOf).orElse(-1L);
         return DataStream.ofPublisher(request.body(), contentType, contentLength);

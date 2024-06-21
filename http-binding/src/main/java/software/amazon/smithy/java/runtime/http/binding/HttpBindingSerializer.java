@@ -55,7 +55,7 @@ public final class HttpBindingSerializer extends SpecificShapeSerializer impleme
     private ByteArrayOutputStream shapeBodyOutput;
     private DataStream httpPayload;
     private Flow.Publisher<? extends SerializableStruct> eventStream;
-    private int responseStatus;
+    private int responseStatus = 200;
 
     private final BindingMatcher bindingMatcher;
     private final UriPattern uriPattern;
@@ -129,17 +129,24 @@ public final class HttpBindingSerializer extends SpecificShapeSerializer impleme
 
     void setHttpPayload(Schema schema, DataStream value) {
         httpPayload = value;
-        String contentType = value.contentType()
-            .orElseGet(() -> {
-                var mediaType = schema.getTrait(MediaTypeTrait.class);
-                if (mediaType != null) {
-                    return mediaType.getValue();
-                } else if (schema.type() == ShapeType.BLOB) {
-                    return DEFAULT_BLOB_CONTENT_TYPE;
-                } else {
-                    return DEFAULT_STRING_CONTENT_TYPE;
-                }
-            });
+        if (headers.containsKey("Content-Type")) {
+            return;
+        }
+
+        String contentType;
+        var mediaType = schema.getTrait(MediaTypeTrait.class);
+        if (mediaType != null) {
+            contentType = mediaType.getValue();
+        } else {
+            contentType = value.contentType()
+                .orElseGet(() -> {
+                    if (schema.type() == ShapeType.BLOB) {
+                        return DEFAULT_BLOB_CONTENT_TYPE;
+                    } else {
+                        return DEFAULT_STRING_CONTENT_TYPE;
+                    }
+                });
+        }
         headers.put("Content-Type", List.of(contentType));
     }
 
@@ -216,10 +223,13 @@ public final class HttpBindingSerializer extends SpecificShapeSerializer impleme
         this.eventStream = stream;
     }
 
+    public void writeContentType() {
+        headers.put("Content-Type", List.of(payloadCodec.getMediaType()));
+    }
+
     private static final class BindingSerializer extends InterceptingSerializer {
         private final HttpBindingSerializer serializer;
-        private ByteArrayOutputStream structureBytes;
-        private ShapeSerializer structureSerializer;
+        private PayloadSerializer payloadSerializer;
 
         private BindingSerializer(HttpBindingSerializer serializer) {
             this.serializer = serializer;
@@ -239,33 +249,8 @@ public final class HttpBindingSerializer extends SpecificShapeSerializer impleme
                 case QUERY_PARAMS -> new HttpQueryParamsSerializer(serializer.queryStringParams::put);
                 case BODY -> ShapeSerializer.nullSerializer(); // handled in HttpBindingSerializer#writeStruct.
                 case PAYLOAD -> {
-                    if (schema.memberTarget().type() == ShapeType.STRUCTURE) {
-                        // Serialize a structure bound to the payload.
-                        serializer.headers.put("Content-Type", List.of(serializer.payloadCodec.getMediaType()));
-                        structureBytes = new ByteArrayOutputStream();
-                        structureSerializer = serializer.payloadCodec.createSerializer(structureBytes);
-                        yield structureSerializer;
-                    } else {
-                        yield new SpecificShapeSerializer() {
-                            @Override
-                            public void writeDataStream(Schema schema, DataStream value) {
-                                serializer.setHttpPayload(schema, value);
-                            }
-
-                            @Override
-                            public void writeEventStream(
-                                Schema schema,
-                                Flow.Publisher<? extends SerializableStruct> value
-                            ) {
-                                serializer.setEventStream(value);
-                            }
-
-                            @Override
-                            public void writeBlob(Schema schema, byte[] value) {
-                                serializer.setHttpPayload(schema, DataStream.ofBytes(value));
-                            }
-                        };
-                    }
+                    payloadSerializer = new PayloadSerializer(serializer, serializer.payloadCodec);
+                    yield payloadSerializer;
                 }
             };
         }
@@ -273,14 +258,11 @@ public final class HttpBindingSerializer extends SpecificShapeSerializer impleme
         @Override
         protected void after(Schema schema) {
             flush();
-            if (structureBytes != null) {
-                structureSerializer.flush();
+            if (payloadSerializer != null && !payloadSerializer.isPayloadWritten()) {
+                payloadSerializer.flush();
                 serializer.setHttpPayload(
                     schema,
-                    DataStream.ofBytes(
-                        structureBytes.toByteArray(),
-                        serializer.payloadCodec.getMediaType()
-                    )
+                    DataStream.ofBytes(payloadSerializer.toByteArray())
                 );
             }
         }

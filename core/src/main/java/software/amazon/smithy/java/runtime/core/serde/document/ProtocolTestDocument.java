@@ -18,6 +18,7 @@ import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
+import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.node.BooleanNode;
@@ -25,6 +26,7 @@ import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.node.NumberNode;
 import software.amazon.smithy.model.node.StringNode;
 import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.model.traits.StreamingTrait;
 
 /**
  * This is a document format used in smithy protocol tests to model expected modeled values.
@@ -38,9 +40,11 @@ public final class ProtocolTestDocument implements Document {
     private final Node node;
     private final ShapeType type;
     private final Schema schema;
+    private final String contentType;
 
-    public ProtocolTestDocument(Node node) {
+    public ProtocolTestDocument(Node node, String contentType) {
         this.node = node;
+        this.contentType = contentType;
 
         // Determine the type from the underlying JSON value.
         this.type = switch (node.getType()) {
@@ -193,7 +197,7 @@ public final class ProtocolTestDocument implements Document {
 
         List<Document> result = new ArrayList<>();
         for (var value : node.expectArrayNode()) {
-            result.add(new ProtocolTestDocument(value));
+            result.add(new ProtocolTestDocument(value, contentType));
         }
 
         return result;
@@ -211,7 +215,7 @@ public final class ProtocolTestDocument implements Document {
             for (var entry : node.expectObjectNode().getMembers().entrySet()) {
                 result.put(
                     entry.getKey().getValue(),
-                    new ProtocolTestDocument(entry.getValue())
+                    new ProtocolTestDocument(entry.getValue(), contentType)
                 );
             }
             return result;
@@ -226,7 +230,7 @@ public final class ProtocolTestDocument implements Document {
         if (node.isObjectNode()) {
             var memberDocument = node.expectObjectNode().getMember(memberName);
             if (memberDocument.isPresent() && !memberDocument.get().isNullNode()) {
-                return new ProtocolTestDocument(memberDocument.get());
+                return new ProtocolTestDocument(memberDocument.get(), contentType);
             }
         }
         return null;
@@ -265,7 +269,11 @@ public final class ProtocolTestDocument implements Document {
 
     @Override
     public <T extends SerializableShape> void deserializeInto(ShapeBuilder<T> builder) {
-        builder.deserialize(new ProtocolTestDocumentDeserializer(this));
+        ProtocolTestDocumentDeserializer decoder = new ProtocolTestDocumentDeserializer(this, contentType);
+        builder.deserialize(decoder);
+        if (decoder.getDataStream() != null) {
+            builder.setDataStream(decoder.getDataStream());
+        }
     }
 
     @Override
@@ -296,15 +304,18 @@ public final class ProtocolTestDocument implements Document {
     private static final class ProtocolTestDocumentDeserializer extends DocumentDeserializer {
 
         private final ProtocolTestDocument jsonDocument;
+        private final String contentType;
+        private DataStream dataStream;
 
-        ProtocolTestDocumentDeserializer(ProtocolTestDocument value) {
+        ProtocolTestDocumentDeserializer(ProtocolTestDocument value, String contentType) {
             super(value);
             this.jsonDocument = value;
+            this.contentType = contentType;
         }
 
         @Override
         protected DocumentDeserializer deserializer(Document nextValue) {
-            return new ProtocolTestDocumentDeserializer((ProtocolTestDocument) nextValue);
+            return new ProtocolTestDocumentDeserializer((ProtocolTestDocument) nextValue, contentType);
         }
 
         @Override
@@ -312,7 +323,11 @@ public final class ProtocolTestDocument implements Document {
             for (var member : schema.members()) {
                 var nextValue = jsonDocument.getMember(member.memberName());
                 if (nextValue != null) {
-                    structMemberConsumer.accept(state, member, deserializer(nextValue));
+                    if (member.memberTarget().hasTrait(StreamingTrait.class)) {
+                        dataStream = DataStream.ofBytes(nextValue.asBlob(), contentType);
+                    } else {
+                        structMemberConsumer.accept(state, member, deserializer(nextValue));
+                    }
                 }
             }
         }
@@ -328,6 +343,10 @@ public final class ProtocolTestDocument implements Document {
                 throw new SerializationException("Attempted to read non-null value as null");
             }
             return null;
+        }
+
+        public DataStream getDataStream() {
+            return dataStream;
         }
     }
 }

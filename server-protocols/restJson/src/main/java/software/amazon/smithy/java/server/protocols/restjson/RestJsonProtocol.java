@@ -122,15 +122,16 @@ public final class RestJsonProtocol extends ServerProtocol {
             }
         }
 
+        HttpHeaders headers = job.request().getContext().get(HttpAttributes.HTTP_HEADERS);
         var deser = HttpBinding.requestDeserializer()
             .inputShapeBuilder(shapeBuilder)
             .pathLabelValues(labelValues)
             .request(
                 SmithyHttpRequest.builder()
-                    .headers(job.request().getContext().get(HttpAttributes.HTTP_HEADERS))
+                    .headers(headers)
                     .uri(job.request().getContext().get(HttpAttributes.HTTP_URI))
                     .method(job.request().getContext().get(HttpAttributes.HTTP_METHOD))
-                    .body(getDataStream(job.request().getValue()))
+                    .body(getDataStream(job.request().getValue(), headers))
                     .build()
             )
             .payloadCodec(codec);
@@ -161,11 +162,19 @@ public final class RestJsonProtocol extends ServerProtocol {
         return CompletableFuture.completedFuture(null);
     }
 
-    private DataStream getDataStream(Value value) {
+    private DataStream getDataStream(Value value, HttpHeaders headers) {
         if (value instanceof ByteValue bv) {
-            return DataStream.ofBytes(bv.get());
+            byte[] bytes = bv.get();
+            if (bytes == null || bytes.length == 0) {
+                return DataStream.ofEmpty();
+            }
+            return DataStream.ofBytes(bv.get(), headers.firstValue("content-type").orElse(null));
         } else if (value instanceof ReactiveByteValue rbv) {
-            return DataStream.ofPublisher(rbv.get(), null, -1);
+            return DataStream.ofPublisher(
+                rbv.get(),
+                headers.firstValue("content-type").orElse(null),
+                headers.firstValue("content-length").map(Long::parseLong).orElse(-1L)
+            );
         } else {
             throw new IllegalStateException("Unexpected type: " + value.getClass());
         }
@@ -197,7 +206,7 @@ public final class RestJsonProtocol extends ServerProtocol {
         );
         serializer.writeStruct(schema, value);
         serializer.flush();
-        int responseStatus = errorTrait != null ? errorTrait.getCode() : 200;
+        int responseStatus = errorTrait != null ? errorTrait.getCode() : serializer.getResponseStatus();
         HttpHeaders headers = serializer.getHeaders();
         if (errorTrait != null) {
             headers = addHeader(headers, "X-Amzn-ErrorType", schema.id().getName());

@@ -39,6 +39,23 @@ record RequestTestInvocationContext(
             new ParameterResolver() {
                 @Override
                 public boolean supportsParameter(
+                    ParameterContext parameterContext,
+                    ExtensionContext extensionContext
+                ) throws ParameterResolutionException {
+                    return parameterContext.getParameter().getType() == String.class;
+                }
+
+                @Override
+                public Object resolveParameter(
+                    ParameterContext parameterContext,
+                    ExtensionContext extensionContext
+                ) throws ParameterResolutionException {
+                    return testCase.getId();
+                }
+            },
+            new ParameterResolver() {
+                @Override
+                public boolean supportsParameter(
                     ParameterContext paramCtx,
                     ExtensionContext extensionCtx
                 ) throws ParameterResolutionException {
@@ -112,7 +129,8 @@ record RequestTestInvocationContext(
                         return manualExpectation();
                     }
                     var builder = inputBuilder.get();
-                    new ProtocolTestDocument(testCase.getParams()).deserializeInto(builder);
+                    new ProtocolTestDocument(testCase.getParams(), testCase.getBodyMediaType().orElse(null))
+                        .deserializeInto(builder);
                     return builder.build();
                 }
             }
