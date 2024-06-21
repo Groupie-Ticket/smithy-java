@@ -21,26 +21,16 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandleProxies;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URI;
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Flow;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
@@ -59,23 +49,17 @@ import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.server.ServerSymbolProperties;
 import software.amazon.smithy.java.codegen.server.ServiceJavaSymbolProvider;
 import software.amazon.smithy.java.runtime.core.schema.SerializableShape;
-import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
-import software.amazon.smithy.java.runtime.core.serde.DataStream;
-import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.java.server.RequestContext;
 import software.amazon.smithy.java.server.Server;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.java.server.netty.NettyServerBuilder;
 import software.amazon.smithy.model.Model;
-import software.amazon.smithy.model.node.Node;
-import software.amazon.smithy.model.node.NumberNode;
 import software.amazon.smithy.model.node.ObjectNode;
-import software.amazon.smithy.model.node.StringNode;
 import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
+import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
-import software.amazon.smithy.model.transform.ModelTransformer;
 import software.amazon.smithy.protocoltests.traits.AppliesTo;
 import software.amazon.smithy.protocoltests.traits.HttpRequestTestCase;
 import software.amazon.smithy.protocoltests.traits.HttpRequestTestsTrait;
@@ -116,25 +100,7 @@ public class EndToEndProtocolTests {
         TestPayloadBlobInput.builder().contentType("application/octet-stream").build()
     );
 
-    private record TestOperation(
-        ShapeId operationId, MockOperation mock,
-        Supplier<ShapeBuilder<?>> inputBuilderSupplier,
-        List<HttpRequestTestCase> requestTestCases,
-        Supplier<ShapeBuilder<?>> outputBuilderSupplier,
-        List<HttpResponseTestCase> responseTestCases
-    ) {}
-
-    private record TestService(
-        ShapeId serviceId,
-        List<TestOperation> operations,
-        Server endpoint,
-        int testPort,
-        Service service
-    ) {}
-
     private static final List<TestService> testServices = new ArrayList<>();
-
-    private static final Map<URI, TestClient> clients = new ConcurrentHashMap<>();
 
     public static final String NS = "aws.protocoltests.restjson";
 
@@ -143,158 +109,33 @@ public class EndToEndProtocolTests {
         AtomicInteger testPort = new AtomicInteger(8020);
         MethodHandles.Lookup caller = MethodHandles.lookup();
 
-        Model base = Model.assembler(EndToEndProtocolTests.class.getClassLoader())
-            .discoverModels(EndToEndProtocolTests.class.getClassLoader())
-            .assemble()
-            .unwrap();
+        for (Map.Entry<ProtocolTestDiscovery.ProtocolTestService, List<OperationShape>> entry : ProtocolTestDiscovery
+            .get()
+            .discoverTests(EndToEndProtocolTests::testFilter)
+            .entrySet()) {
 
-        ModelTransformer transformer = ModelTransformer.create();
-        Model filtered = filterModel(transformer, base);
-        for (ServiceShape serviceShape : filtered.getServiceShapes()) {
-            Model serviceModel = performDefaultTransformations(serviceShape, transformer, filtered);
-            SymbolProvider sp = SymbolProvider.cache(new ServiceJavaSymbolProvider(serviceModel, serviceShape, NS));
+            var serviceModel = entry.getKey().serviceModel();
+            var serviceShape = entry.getKey().service();
+            var sp = SymbolProvider.cache(new ServiceJavaSymbolProvider(serviceModel, serviceShape, NS));
 
-            try {
-                Class<?> serviceClass = Class.forName(sp.toSymbol(serviceShape).toString());
-                AtomicReference<Object> builderRef = new AtomicReference<>(
-                    serviceClass.getDeclaredMethod("builder").invoke(null)
-                );
+            var testOperations = getTestOperations(entry.getValue(), sp, serviceModel, caller);
 
-                List<TestOperation> testOperations = new ArrayList<>();
+            Service service = buildService(testOperations, sp, serviceModel, serviceShape, caller);
+            int port = testPort.incrementAndGet();
+            Server endpoint = new NettyServerBuilder(URI.create("http://localhost:" + port))
+                .addService(service)
+                .build();
+            endpoint.start();
 
-                serviceShape.getAllOperations()
-                    .stream()
-                    .map(serviceModel::getShape)
-                    .filter(Optional::isPresent)
-                    .map(Optional::get)
-                    .map(s -> (OperationShape) s)
-                    .forEach(operationShape -> {
-                        var mock = new MockOperation(operationShape.getId());
-                        Supplier<ShapeBuilder<?>> inputBuilderSupplier;
-                        Supplier<ShapeBuilder<?>> outputBuilderSupplier;
-                        try {
-                            Class<?> inputType = Class.forName(
-                                sp.toSymbol(serviceModel.expectShape(operationShape.getInputShape()))
-                                    .toString()
-                            );
-                            Class<?> inputBuilderType = Class.forName(
-                                sp.toSymbol(serviceModel.expectShape(operationShape.getInputShape()))
-                                    .toString() + "$Builder"
-                            );
-                            MethodHandle inputBuilder = caller.findStatic(
-                                inputType,
-                                "builder",
-                                MethodType.methodType(inputBuilderType)
-                            );
-                            inputBuilderSupplier = MethodHandleProxies.asInterfaceInstance(
-                                Supplier.class,
-                                inputBuilder
-                            );
-
-
-                            Class<?> outputType = Class.forName(
-                                sp.toSymbol(serviceModel.expectShape(operationShape.getOutputShape()))
-                                    .toString()
-                            );
-                            Class<?> outputBuilderType = Class.forName(
-                                sp.toSymbol(serviceModel.expectShape(operationShape.getOutputShape()))
-                                    .toString() + "$Builder"
-                            );
-                            MethodHandle outputBuilder = caller.findStatic(
-                                outputType,
-                                "builder",
-                                MethodType.methodType(outputBuilderType)
-                            );
-                            outputBuilderSupplier = MethodHandleProxies.asInterfaceInstance(
-                                Supplier.class,
-                                outputBuilder
-                            );
-                        } catch (Throwable t) {
-                            throw new RuntimeException(t);
-                        }
-                        testOperations.add(
-                            new TestOperation(
-                                operationShape.getId(),
-                                mock,
-                                inputBuilderSupplier,
-                                operationShape.getTrait(HttpRequestTestsTrait.class)
-                                    .map(
-                                        hrt -> hrt.getTestCases()
-                                            .stream()
-                                            .filter(
-                                                tc -> tc.getAppliesTo().orElse(AppliesTo.SERVER) == AppliesTo.SERVER
-                                            )
-                                            .toList()
-                                    )
-                                    .orElse(Collections.emptyList()),
-                                outputBuilderSupplier,
-                                operationShape.getTrait(HttpResponseTestsTrait.class)
-                                    .map(
-                                        hrt -> hrt.getTestCases()
-                                            .stream()
-                                            .filter(
-                                                tc -> tc.getAppliesTo().orElse(AppliesTo.SERVER) == AppliesTo.SERVER
-                                            )
-                                            .toList()
-                                    )
-                                    .orElse(Collections.emptyList())
-
-                            )
-                        );
-                        String cappedName = CodegenUtils.getDefaultName(operationShape, serviceShape);
-                        try {
-                            Class<?> operationType = Class.forName(
-                                sp.toSymbol(operationShape)
-                                    .expectProperty(ServerSymbolProperties.STUB_OPERATION)
-                                    .toString()
-                            );
-                            Class<?> stage = Class.forName(serviceClass.getName() + "$" + cappedName + "Stage");
-                            Method addMethod = stage.getDeclaredMethod(
-                                "add" + cappedName + "Operation",
-                                operationType
-                            );
-
-                            builderRef.set(
-                                addMethod.invoke(
-                                    builderRef.get(),
-                                    MethodHandleProxies.asInterfaceInstance(
-                                        operationType,
-                                        caller.findVirtual(
-                                            MockOperation.class,
-                                            "apply",
-                                            MethodType.methodType(Object.class, Object.class, RequestContext.class)
-                                        ).bindTo(mock)
-                                    )
-                                )
-                            );
-
-                        } catch (Throwable e) {
-                            throw new RuntimeException(e);
-                        }
-                    });
-                Class<?> buildStage = Class.forName(serviceClass.getName() + "$BuildStage");
-                MethodHandle build = caller.findVirtual(buildStage, "build", MethodType.methodType(serviceClass));
-
-
-                Service service = (Service) build.invoke(builderRef.get());
-                int port = testPort.incrementAndGet();
-                Server endpoint = new NettyServerBuilder(URI.create("http://localhost:" + port))
-                    .addService(service)
-                    .build();
-                endpoint.start();
-                testServices.add(
-                    new TestService(
-                        serviceShape.getId(),
-                        testOperations,
-                        endpoint,
-                        port,
-                        service
-                    )
-                );
-            } catch (ClassNotFoundException | IllegalAccessException | NoSuchMethodException
-                | InvocationTargetException e) {
-                throw new RuntimeException(e);
-            }
+            testServices.add(
+                new TestService(
+                    serviceShape.getId(),
+                    testOperations,
+                    endpoint,
+                    port,
+                    service
+                )
+            );
         }
     }
 
@@ -303,29 +144,6 @@ public class EndToEndProtocolTests {
         for (TestService testService : testServices) {
             testService.endpoint().stop();
         }
-        for (TestClient c : clients.values()) {
-            c.shutdown();
-        }
-    }
-
-    private static Model filterModel(ModelTransformer transformer, Model base) {
-        Model filtered = transformer.removeShapesIf(
-            base,
-            s -> s instanceof ServiceShape
-                && !s.getId().getNamespace().equals(NS)
-        );
-        filtered = transformer.removeShapesIf(filtered, s -> REMOVED_OPERATIONS.contains(s.getId()));
-        return transformer.removeUnreferencedShapes(filtered);
-    }
-
-    private static Model performDefaultTransformations(
-        ServiceShape serviceShape,
-        ModelTransformer transformer,
-        Model filtered
-    ) {
-        filtered = transformer.copyServiceErrorsToOperations(filtered, serviceShape);
-        filtered = transformer.flattenAndRemoveMixins(filtered);
-        return transformer.createDedicatedInputAndOutput(filtered, "Input", "Output");
     }
 
     @TestTemplate
@@ -342,9 +160,8 @@ public class EndToEndProtocolTests {
             testId + " is currently unsupported"
         );
         var captor = mock.expectRequest();
-        var c = getClient(endpoint);
-        c.sendRequest(rawRequest);
-        var expected = normalize(deserializedRequest);
+        TestClient.get(endpoint).sendRequest(rawRequest);
+        var expected = Normalizer.normalize(deserializedRequest);
         var actual = captor.get();
         assertEquals(expected, actual);
     }
@@ -364,10 +181,10 @@ public class EndToEndProtocolTests {
             testId + " is currently unsupported"
         );
         mock.setResponse(deserializedResponse);
-        var c = getClient(endpoint);
-        var serviceResponse = c.call(
-            getTestRequest(endpoint, serviceCoordinate.serviceId(), serviceCoordinate.operationId())
-        );
+        var serviceResponse = TestClient.get(endpoint)
+            .call(
+                getTestRequest(endpoint, serviceCoordinate.serviceId(), serviceCoordinate.operationId())
+            );
 
         assertEquals(expectedResponse.code, serviceResponse.status().code());
 
@@ -394,8 +211,10 @@ public class EndToEndProtocolTests {
             expectedResponse.bodyMediaType.ifPresentOrElse(expectedMediaType -> {
                 if (expectedMediaType.equals("application/json")) {
                     assertEquals(
-                        scrubJSONNaNs(ObjectNode.parse(expectedBody)),
-                        scrubJSONNaNs(ObjectNode.parse(serviceResponse.content().toString(StandardCharsets.UTF_8)))
+                        Normalizer.normalize(ObjectNode.parse(expectedBody)),
+                        Normalizer.normalize(
+                            ObjectNode.parse(serviceResponse.content().toString(StandardCharsets.UTF_8))
+                        )
                     );
                 } else {
                     assertEquals(expectedBody, serviceResponse.content().toString(StandardCharsets.UTF_8));
@@ -440,10 +259,6 @@ public class EndToEndProtocolTests {
         );
     }
 
-    private TestClient getClient(URI endpoint) {
-        return clients.computeIfAbsent(endpoint, $ -> new TestClient(endpoint));
-    }
-
     public static class RequestTestInvocationContextProvider implements TestTemplateInvocationContextProvider {
 
         public RequestTestInvocationContextProvider() {}
@@ -478,6 +293,136 @@ public class EndToEndProtocolTests {
             }
             return contexts.stream();
         }
+    }
+
+    private static boolean testFilter(Shape s) {
+        if (s instanceof ServiceShape serv) {
+            return !serv.getId().getNamespace().equals(NS);
+        }
+
+        if (s instanceof OperationShape op) {
+            return REMOVED_OPERATIONS.contains(op.getId());
+        }
+
+        return false;
+    }
+
+    private static Service buildService(
+        List<TestOperation> testOperations,
+        SymbolProvider sp,
+        Model serviceModel,
+        ServiceShape serviceShape,
+        MethodHandles.Lookup caller
+    ) throws Throwable {
+        Class<?> serviceClass = Class.forName(sp.toSymbol(serviceShape).toString());
+        AtomicReference<Object> builderRef = new AtomicReference<>(
+            serviceClass.getDeclaredMethod("builder").invoke(null)
+        );
+
+        for (TestOperation testOperation : testOperations) {
+            var operationShape = serviceModel.expectShape(testOperation.operationId());
+            String cappedName = CodegenUtils.getDefaultName(operationShape, serviceShape);
+            try {
+                Class<?> operationType = Class.forName(
+                    sp.toSymbol(operationShape)
+                        .expectProperty(ServerSymbolProperties.STUB_OPERATION)
+                        .toString()
+                );
+                Class<?> stage = Class.forName(serviceClass.getName() + "$" + cappedName + "Stage");
+                Method addMethod = stage.getDeclaredMethod(
+                    "add" + cappedName + "Operation",
+                    operationType
+                );
+
+                builderRef.set(
+                    addMethod.invoke(
+                        builderRef.get(),
+                        MethodHandleProxies.asInterfaceInstance(
+                            operationType,
+                            caller.findVirtual(
+                                MockOperation.class,
+                                "apply",
+                                MethodType.methodType(Object.class, Object.class, RequestContext.class)
+                            ).bindTo(testOperation.mock())
+                        )
+                    )
+                );
+
+            } catch (Throwable e) {
+                throw new RuntimeException(e);
+            }
+        }
+        Class<?> buildStage = Class.forName(serviceClass.getName() + "$BuildStage");
+        MethodHandle build = caller.findVirtual(buildStage, "build", MethodType.methodType(serviceClass));
+
+        return (Service) build.invoke(builderRef.get());
+    }
+
+    private static List<TestOperation> getTestOperations(
+        List<OperationShape> operations,
+        SymbolProvider sp,
+        Model serviceModel,
+        MethodHandles.Lookup caller
+    ) throws ClassNotFoundException, NoSuchMethodException, IllegalAccessException {
+        List<TestOperation> testOperations = new ArrayList<>();
+        for (OperationShape operationShape : operations) {
+            var mock = new MockOperation(operationShape.getId());
+
+            Supplier<ShapeBuilder<?>> inputBuilderSupplier = getShapeBuilderSupplier(
+                operationShape.getInputShape(),
+                sp,
+                serviceModel,
+                caller
+            );
+
+            Supplier<ShapeBuilder<?>> outputBuilderSupplier = getShapeBuilderSupplier(
+                operationShape.getOutputShape(),
+                sp,
+                serviceModel,
+                caller
+            );
+
+            testOperations.add(
+                new TestOperation(
+                    operationShape.getId(),
+                    mock,
+                    inputBuilderSupplier,
+                    operationShape.getTrait(HttpRequestTestsTrait.class)
+                        .map(hrt -> hrt.getTestCasesFor(AppliesTo.SERVER))
+                        .orElse(Collections.emptyList()),
+                    outputBuilderSupplier,
+                    operationShape.getTrait(HttpResponseTestsTrait.class)
+                        .map(hrt -> hrt.getTestCasesFor(AppliesTo.SERVER))
+                        .orElse(Collections.emptyList())
+                )
+            );
+        }
+        return testOperations;
+    }
+
+    private static Supplier<ShapeBuilder<?>> getShapeBuilderSupplier(
+        ShapeId buildableShapeId,
+        SymbolProvider sp,
+        Model serviceModel,
+        MethodHandles.Lookup caller
+    ) throws ClassNotFoundException, NoSuchMethodException, IllegalAccessException {
+        var buildableShapeSymbol = sp.toSymbol(serviceModel.expectShape(buildableShapeId));
+
+        Class<?> shapeType = Class.forName(
+            buildableShapeSymbol.toString()
+        );
+        Class<?> shapeBuilderType = Class.forName(
+            buildableShapeSymbol + "$Builder"
+        );
+        MethodHandle builder = caller.findStatic(
+            shapeType,
+            "builder",
+            MethodType.methodType(shapeBuilderType)
+        );
+        return MethodHandleProxies.asInterfaceInstance(
+            Supplier.class,
+            builder
+        );
     }
 
     public static class ResponseTestInvocationContextProvider implements TestTemplateInvocationContextProvider {
@@ -529,143 +474,20 @@ public class EndToEndProtocolTests {
         int code, Map<String, String> headers, Optional<String> body, Optional<String> bodyMediaType
     ) {}
 
-    private static final float FNAN_STANDIN = ThreadLocalRandom.current().nextFloat();
-    private static final double DNAN_STANDIN = ThreadLocalRandom.current().nextDouble();
+    private record TestOperation(
+        ShapeId operationId, MockOperation mock,
+        Supplier<ShapeBuilder<?>> inputBuilderSupplier,
+        List<HttpRequestTestCase> requestTestCases,
+        Supplier<ShapeBuilder<?>> outputBuilderSupplier,
+        List<HttpResponseTestCase> responseTestCases
+    ) {}
 
-    static <T> T normalize(T obj) {
-        if (obj instanceof Document d) {
-            return (T) Document.createFromObject(d.asObject());
-        }
-        if (!(obj instanceof SerializableStruct)) {
-            return obj;
-        }
-        try {
-            for (Field f : obj.getClass().getDeclaredFields()) {
-                f.setAccessible(true);
-                if (f.get(obj) == null) {
-                    continue;
-                }
-                if (f.getType() == double.class ||
-                    f.getType() == Double.class) {
-                    Double dVal = (Double) f.get(obj);
-                    if (dVal != null && dVal.isNaN()) {
-                        f.set(obj, DNAN_STANDIN);
-                    }
-                }
-                if (f.getType() == float.class ||
-                    f.getType() == Float.class) {
-                    Float fVal = (Float) f.get(obj);
-                    if (fVal != null && fVal.isNaN()) {
-                        f.set(obj, FNAN_STANDIN);
-                    }
-                }
-                if (f.getType() == Document.class) {
-                    Document doc = (Document) f.get(obj);
-                    f.set(obj, Document.createFromObject(doc.asObject()));
-                }
-                if (f.getType() == Map.class) {
-                    Map map = (Map) f.get(obj);
-                    for (Object e : map.entrySet()) {
-                        Map.Entry entry = (Map.Entry) e;
-                        entry.setValue(normalize(entry.getValue()));
-                    }
-                }
-                if (List.class.isAssignableFrom(f.getType())) {
-                    List c = (List) f.get(obj);
-                    for (ListIterator<Object> iter = c.listIterator(); iter.hasNext();) {
-                        iter.set(normalize(iter.next()));
-                    }
-                }
-                if (DataStream.class.isAssignableFrom(f.getType())) {
-                    DataStream ds = (DataStream) f.get(obj);
-                    f.set(obj, new TestDataStream(ds));
-                }
-            }
-        } catch (IllegalAccessException e) {
-            throw new RuntimeException(e);
-        }
-        return obj;
-    }
-
-    private Node scrubJSONNaNs(Node n) {
-        if (n.isNumberNode() && n.expectNumberNode().isNaN()) {
-            return new NumberNode(DNAN_STANDIN, n.getSourceLocation());
-        }
-        if (n.isObjectNode()) {
-            var builder = ObjectNode.builder();
-            for (Map.Entry<StringNode, Node> member : ((ObjectNode) n).getMembers().entrySet()) {
-                if (member.getValue().isNumberNode()) {
-                    if (member.getValue().expectNumberNode().isNaN()) {
-                        builder.withMember(
-                            member.getKey(),
-                            new NumberNode(DNAN_STANDIN, member.getValue().getSourceLocation())
-                        );
-                    } else {
-                        builder.withMember(member.getKey(), member.getValue());
-                    }
-                } else if (member.getValue().isObjectNode()) {
-                    builder.withMember(member.getKey(), normalize(member.getValue()));
-                } else {
-                    builder.withMember(member.getKey(), member.getValue());
-                }
-            }
-            return builder.build();
-        }
-        return n;
-    }
-
-    private static final class TestDataStream implements DataStream {
-        private final byte[] bytes;
-        private final Optional<String> contentType;
-
-        TestDataStream(DataStream ds) {
-            try {
-                bytes = ds.asBytes().toCompletableFuture().get();
-            } catch (InterruptedException | ExecutionException e) {
-                throw new RuntimeException(e);
-            }
-            contentType = ds.contentType();
-        }
-
-        @Override
-        public long contentLength() {
-            return bytes.length;
-        }
-
-        @Override
-        public Optional<String> contentType() {
-            return contentType;
-        }
-
-        @Override
-        public void subscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
-            subscriber.onSubscribe(new Flow.Subscription() {
-                @Override
-                public void request(long n) {
-                    subscriber.onNext(ByteBuffer.wrap(bytes));
-                    subscriber.onComplete();
-                }
-
-                @Override
-                public void cancel() {
-
-                }
-            });
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            TestDataStream that = (TestDataStream) o;
-            return Objects.deepEquals(bytes, that.bytes);
-        }
-
-        @Override
-        public int hashCode() {
-            return Arrays.hashCode(bytes);
-        }
-    }
-
+    private record TestService(
+        ShapeId serviceId,
+        List<TestOperation> operations,
+        Server endpoint,
+        int testPort,
+        Service service
+    ) {}
 
 }

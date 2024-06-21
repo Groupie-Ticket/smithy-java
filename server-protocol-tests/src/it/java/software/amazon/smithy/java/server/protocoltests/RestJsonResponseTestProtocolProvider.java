@@ -16,9 +16,12 @@ import software.amazon.smithy.java.server.core.ShapeValue;
 import software.amazon.smithy.java.server.protocols.restjson.RestJsonProtocol;
 import software.amazon.smithy.model.shapes.ShapeId;
 
-public class RestJsonResponseTestProtocolProvider implements
+/**
+ * This exists to avoid making response tests try to figure out how to get operations invoked; it instead
+ * hardcodes two headers to let an operation be invoked directly with no input.
+ */
+public final class RestJsonResponseTestProtocolProvider implements
     ServerProtocolProvider<RestJsonResponseTestProtocolProvider.RestJsonResponseTestProtocol> {
-
 
     @Override
     public RestJsonResponseTestProtocol provideProtocolHandler(Service service) {

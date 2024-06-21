@@ -1,1 +1,2 @@
 software.amazon.smithy.java.server.protocoltests.RestJsonResponseTestProtocolProvider
+software.amazon.smithy.java.server.protocoltests.RestJsonRequestTestProtocolProvider

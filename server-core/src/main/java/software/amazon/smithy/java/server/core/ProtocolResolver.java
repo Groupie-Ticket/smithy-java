@@ -30,7 +30,7 @@ public final class ProtocolResolver {
     public ProtocolResolver(Service service) {
         serverProtocolHandlers = SERVER_PROTOCOL_HANDLERS.values()
             .stream()
-            .sorted(Comparator.comparing(ServerProtocolProvider::priority))
+            .sorted(Comparator.<ServerProtocolProvider, Integer>comparing(ServerProtocolProvider::priority).reversed())
             .map(p -> p.provideProtocolHandler(service))
             .toList();
     }
