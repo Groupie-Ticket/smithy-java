@@ -129,6 +129,7 @@ final class RequestBodyPublisher implements Flow.Publisher<ByteBuffer> {
             } else {
                 byte[] copy = new byte[buf.readableBytes()];
                 buf.readBytes(copy);
+                buf.release();
                 queue.add(ByteBuffer.wrap(copy));
                 var sub = requestBodySubscriber;
                 if (pendingWrites.getAndIncrement() == 0) {
@@ -184,6 +185,7 @@ final class RequestBodyPublisher implements Flow.Publisher<ByteBuffer> {
                 this.requestBodySubscriber = null;
                 byte[] copy = new byte[buf.readableBytes()];
                 buf.readBytes(copy);
+                buf.release();
                 queue.add(new Complete(ByteBuffer.wrap(copy)));
                 if (pendingWrites.getAndIncrement() == 0) {
                     downstreamExecutor.execute(() -> flushWrites(sub));
