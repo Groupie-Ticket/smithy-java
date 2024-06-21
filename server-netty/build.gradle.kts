@@ -1,6 +1,7 @@
 plugins {
     id("smithy-java.module-conventions")
     id("smithy-java.integ-test-conventions")
+    id("smithy-java.codegen-plugin-conventions")
 }
 
 description = "This module provides the server functionality"
@@ -44,9 +45,6 @@ val generateSrcTask = tasks.register<JavaExec>("generateSources") {
 // Add generated POJOs to integ tests and jmh benchmark
 sourceSets {
     it {
-        java {
-            srcDir(generatedSrcDir)
-        }
         resources {
             srcDir(generatedSrcDir)
             include("META-INF/**")
