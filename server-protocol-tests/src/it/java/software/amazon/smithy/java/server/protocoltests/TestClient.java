@@ -34,16 +34,18 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 final class TestClient {
+    private static final ConcurrentHashMap<URI, TestClient> CLIENTS = new ConcurrentHashMap<>();
 
     private final URI endpoint;
     private final Bootstrap clientBootstrap;
 
-    public TestClient(URI endpoint) {
+    private TestClient(URI endpoint) {
         this.endpoint = endpoint;
         clientBootstrap = new Bootstrap()
             .handler(new ChannelInitializer<>() {
@@ -56,6 +58,10 @@ final class TestClient {
             })
             .group(new NioEventLoopGroup())
             .channelFactory(NioSocketChannel::new);
+    }
+
+    public static TestClient get(URI endpoint) {
+        return CLIENTS.computeIfAbsent(endpoint, TestClient::new);
     }
 
     FullHttpResponse sendRequest(EndToEndProtocolTests.HttpRequest request) {
