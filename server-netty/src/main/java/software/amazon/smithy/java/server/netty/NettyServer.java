@@ -18,6 +18,9 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.util.List;
 import java.util.function.Consumer;
+
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
 import software.amazon.smithy.java.server.Server;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.java.server.core.DefaultOrchestratorImpl;
@@ -51,7 +54,9 @@ final class NettyServer implements Server {
             this.workerGroup = new KQueueEventLoopGroup(builder.numWorkers);
             bootstrap.channelFactory(KQueueServerSocketChannel::new);
         } else {
-            throw new IllegalStateException("No suitable transport found");
+            this.bossGroup = new NioEventLoopGroup(1);
+            this.workerGroup = new NioEventLoopGroup(builder.numWorkers);
+            bootstrap.channelFactory(NioServerSocketChannel::new);
         }
 
         this.bootstrap = bootstrap;
