@@ -151,7 +151,8 @@ record ResponseTestInvocationContext(
                         return manualExpectation();
                     }
                     var builder = outputBuilder.get();
-                    new ProtocolTestDocument(testCase.getParams()).deserializeInto(builder);
+                    new ProtocolTestDocument(testCase.getParams(), testCase.getBodyMediaType().orElse(null))
+                        .deserializeInto(builder);
                     return builder.build();
                 }
             }

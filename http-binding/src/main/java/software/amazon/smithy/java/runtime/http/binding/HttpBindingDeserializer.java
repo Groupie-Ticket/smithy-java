@@ -23,6 +23,7 @@ import software.amazon.smithy.java.runtime.core.serde.SpecificShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.uri.QueryStringParser;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.HttpQueryTrait;
+import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.utils.SmithyBuilder;
 
 /**
@@ -117,17 +118,20 @@ public final class HttpBindingDeserializer extends SpecificShapeDeserializer imp
                             );
                             structMemberConsumer.accept(state, member, payloadCodec.createDeserializer(bytes));
                         }).toCompletableFuture();
-                    } else if (member.memberTarget().type() == ShapeType.BLOB) {
-                        // Set the payload on shape builder directly. This will fail for misconfigured shapes.
-                        shapeBuilder.setDataStream(body);
-                    } else {
+                    } else if (isEventStream(member)) {
                         EventStreamFrameDecodingProcessor<AwsFlowFrame, ?> stream = new EventStreamFrameDecodingProcessor<>(
                             body,
                             new AwsFlowFrameDecoder(),
                             eventDecoder
                         );
                         shapeBuilder.setEventStream(stream);
-                    }
+                    } else if (member.memberTarget().type() == ShapeType.BLOB
+                        && member.memberTarget().hasTrait(StreamingTrait.class)) {
+                            // Set the payload on shape builder directly. This will fail for misconfigured shapes.
+                            shapeBuilder.setDataStream(body);
+                        } else if (body != null && !(body.hasKnownLength() && body.contentLength() == 0)) {
+                            structMemberConsumer.accept(state, member, new PayloadDeserializer(payloadCodec, body));
+                        }
                 }
                 default -> throw new UnsupportedOperationException(bindingMatcher.match(member) + "not supported yet");
             }
@@ -149,6 +153,11 @@ public final class HttpBindingDeserializer extends SpecificShapeDeserializer imp
                 });
             }).toCompletableFuture();
         }
+    }
+
+    private static boolean isEventStream(Schema member) {
+        return member.memberTarget().type() == ShapeType.UNION
+            && member.memberTarget().hasTrait(StreamingTrait.class);
     }
 
     // TODO: Should there be a configurable limit on the client/server for how much can be read in memory?

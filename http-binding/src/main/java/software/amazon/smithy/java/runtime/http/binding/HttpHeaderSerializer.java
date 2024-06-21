@@ -7,6 +7,7 @@ package software.amazon.smithy.java.runtime.http.binding;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.function.BiConsumer;
@@ -17,6 +18,7 @@ import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
 import software.amazon.smithy.model.traits.HttpHeaderTrait;
+import software.amazon.smithy.model.traits.MediaTypeTrait;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
 final class HttpHeaderSerializer extends SpecificShapeSerializer {
@@ -41,7 +43,14 @@ final class HttpHeaderSerializer extends SpecificShapeSerializer {
     void writeHeader(Schema schema, Supplier<String> supplier) {
         var headerTrait = schema.getTrait(HttpHeaderTrait.class);
         var field = headerTrait != null ? headerTrait.getValue() : schema.memberName();
-        headerWriter.accept(field, supplier.get());
+        if (schema.hasTrait(MediaTypeTrait.class)) {
+            headerWriter.accept(
+                field,
+                Base64.getEncoder().encodeToString(supplier.get().getBytes(StandardCharsets.UTF_8))
+            );
+        } else {
+            headerWriter.accept(field, supplier.get());
+        }
     }
 
     @Override

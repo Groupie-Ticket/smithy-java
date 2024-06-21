@@ -36,6 +36,7 @@ import software.amazon.smithy.model.traits.RequiresLengthTrait;
 import software.amazon.smithy.model.traits.RetryableTrait;
 import software.amazon.smithy.model.traits.SensitiveTrait;
 import software.amazon.smithy.model.traits.SparseTrait;
+import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 import software.amazon.smithy.model.traits.UniqueItemsTrait;
 import software.amazon.smithy.model.traits.XmlAttributeTrait;
@@ -94,6 +95,7 @@ public class CodegenContextTest {
                 EventPayloadTrait.ID,
                 HostLabelTrait.ID,
                 EndpointTrait.ID,
+                StreamingTrait.ID,
                 // Protocol Traits
                 CorsTrait.ID,
                 HttpTrait.ID,
@@ -141,7 +143,8 @@ public class CodegenContextTest {
                 EventHeaderTrait.ID,
                 EventPayloadTrait.ID,
                 HostLabelTrait.ID,
-                EndpointTrait.ID
+                EndpointTrait.ID,
+                StreamingTrait.ID
             )
         );
     }

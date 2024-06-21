@@ -38,6 +38,7 @@ import software.amazon.smithy.model.traits.RequiresLengthTrait;
 import software.amazon.smithy.model.traits.RetryableTrait;
 import software.amazon.smithy.model.traits.SensitiveTrait;
 import software.amazon.smithy.model.traits.SparseTrait;
+import software.amazon.smithy.model.traits.StreamingTrait;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 import software.amazon.smithy.model.traits.UniqueItemsTrait;
 import software.amazon.smithy.model.traits.XmlAttributeTrait;
@@ -78,7 +79,9 @@ public class CodeGenerationContext
         EventHeaderTrait.ID,
         EventPayloadTrait.ID,
         HostLabelTrait.ID,
-        EndpointTrait.ID
+        EndpointTrait.ID,
+        // Streaming trait to differentiate types of payload binding
+        StreamingTrait.ID
     );
 
     private final Model model;
