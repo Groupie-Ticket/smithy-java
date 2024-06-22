@@ -49,5 +49,10 @@ final class HttpPrefixHeadersDeserializer extends SpecificShapeDeserializer {
         public String readString(Schema schema) {
             return headers.firstValue(headerName).orElse("");
         }
+
+        @Override
+        public boolean isNull() {
+            return false; // we return empty string if the header is not set
+        }
     }
 }

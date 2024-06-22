@@ -46,10 +46,12 @@ public final class ListGenerator
                             @Override
                             public void accept(${shape:B} values, ${shapeSerializer:T} serializer) {
                                 for (var value : values) {
-                                    ${?sparse}if (value == null) {
+                                    if (value == null) {
+                                        ${?sparse}
                                         serializer.writeNull(${valueSchema:L});
+                                        ${/sparse}
                                         continue;
-                                    }${/sparse}
+                                    }
                                     ${memberSerializer:C|};
                                 }
                             }
@@ -66,12 +68,17 @@ public final class ListGenerator
 
                             @Override
                             public void accept(${shape:B} state, ${shapeDeserializer:T} deserializer) {
-                                ${?sparse}if (deserializer.isNull()) {
+                                if (deserializer.isNull()) {
+                                    ${?sparse}
                                     ${?unique}if (!${/unique}state.add(deserializer.readNull())${^unique};${/unique}${?unique}) {
                                         throw new ${serdeException:T}("Member must have unique values");
                                     }${/unique}
                                     return;
-                                }${/sparse}
+                                    ${/sparse}
+                                    ${^sparse}
+                                    throw new ${serdeException:T}("Null not allowed in non-sparse list");
+                                    ${/sparse}
+                                }
                                 ${?unique}if (!${/unique}state.add($memberDeserializer:C)${^unique};${/unique}${?unique}) {
                                     throw new ${serdeException:T}("Member must have unique values");
                                 }${/unique}

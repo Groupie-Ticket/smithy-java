@@ -7,6 +7,8 @@ package software.amazon.smithy.java.server.protocoltests;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import aws.protocoltests.restjson.model.OmitsSerializingEmptyListsInput;
 import aws.protocoltests.restjson.model.PayloadConfig;
@@ -15,6 +17,7 @@ import aws.protocoltests.restjson.model.TestPayloadStructureInput;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
+import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpVersion;
 import java.lang.invoke.MethodHandle;
@@ -61,6 +64,9 @@ import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.protocoltests.traits.AppliesTo;
+import software.amazon.smithy.protocoltests.traits.HttpMalformedRequestTestCase;
+import software.amazon.smithy.protocoltests.traits.HttpMalformedRequestTestsTrait;
+import software.amazon.smithy.protocoltests.traits.HttpMalformedResponseBodyDefinition;
 import software.amazon.smithy.protocoltests.traits.HttpRequestTestCase;
 import software.amazon.smithy.protocoltests.traits.HttpRequestTestsTrait;
 import software.amazon.smithy.protocoltests.traits.HttpResponseTestCase;
@@ -188,24 +194,7 @@ public class EndToEndProtocolTests {
 
         assertEquals(expectedResponse.code, serviceResponse.status().code());
 
-        for (var headerEntry : expectedResponse.headers.entrySet()) {
-            if (headerEntry.getKey().toLowerCase(Locale.US).startsWith("x-")) {
-                assertEquals(
-                    headerEntry.getValue(),
-                    convertResponseHeader(
-                        headerEntry.getKey(),
-                        serviceResponse.headers().getAll(headerEntry.getKey())
-                    ),
-                    "Mismatch for expected header: " + headerEntry.getKey()
-                );
-            } else {
-                assertEquals(
-                    headerEntry.getValue(),
-                    serviceResponse.headers().get(headerEntry.getKey()),
-                    "Mismatch for expected header " + headerEntry.getKey()
-                );
-            }
-        }
+        assertHeaders(expectedResponse, serviceResponse);
 
         expectedResponse.body.ifPresent(expectedBody -> {
             expectedResponse.bodyMediaType.ifPresentOrElse(expectedMediaType -> {
@@ -234,7 +223,76 @@ public class EndToEndProtocolTests {
         });
     }
 
-    private String convertResponseHeader(String key, List<String> values) {
+    @TestTemplate
+    @ExtendWith(MalformedRequestTestInvocationContextProvider.class)
+    void malformedRequestTest(
+        String testId,
+        URI endpoint,
+        HttpRequest request,
+        HttpResponse expectedResponse,
+        HttpMalformedResponseBodyDefinition bodyDefinition,
+        MockOperation mock
+    ) {
+        Assumptions.assumeFalse(
+            SKIPPED_TESTS.contains(testId),
+            testId + " is currently unsupported"
+        );
+        var captor = mock.rejectRequest();
+        var response = TestClient.get(endpoint).sendRequest(request);
+
+        assertNull(captor.get());
+
+        assertEquals(expectedResponse.code(), response.status().code());
+        assertHeaders(expectedResponse, response);
+
+        if (bodyDefinition == null) {
+            return;
+        }
+
+        String responseContent = response.content().toString(StandardCharsets.UTF_8);
+        bodyDefinition.getContents().ifPresent(contents -> {
+            if ("application/json".equals(bodyDefinition.getMediaType())) {
+                assertEquals(
+                    Normalizer.normalize(ObjectNode.parse(contents)),
+                    Normalizer.normalize(
+                        ObjectNode.parse(responseContent)
+                    )
+                );
+            } else {
+                assertEquals(contents, responseContent);
+            }
+        });
+
+        bodyDefinition.getMessageRegex().ifPresent(regex -> {
+            assertTrue(
+                responseContent.matches(regex),
+                "Expected message mtching " + regex + ", was " + responseContent
+            );
+        });
+    }
+
+    private static void assertHeaders(HttpResponse expectedResponse, FullHttpResponse serviceResponse) {
+        for (var headerEntry : expectedResponse.headers.entrySet()) {
+            if (headerEntry.getKey().toLowerCase(Locale.US).startsWith("x-")) {
+                assertEquals(
+                    headerEntry.getValue(),
+                    convertResponseHeader(
+                        headerEntry.getKey(),
+                        serviceResponse.headers().getAll(headerEntry.getKey())
+                    ),
+                    "Mismatch for expected header: " + headerEntry.getKey()
+                );
+            } else {
+                assertEquals(
+                    headerEntry.getValue(),
+                    serviceResponse.headers().get(headerEntry.getKey()),
+                    "Mismatch for expected header " + headerEntry.getKey()
+                );
+            }
+        }
+    }
+
+    private static String convertResponseHeader(String key, List<String> values) {
         if (!key.equalsIgnoreCase("x-stringlist")) {
             return String.join(", ", values);
         }
@@ -257,42 +315,6 @@ public class EndToEndProtocolTests {
                 .add("x-protocol-test-operation", operationId.toString()),
             new DefaultHttpHeaders()
         );
-    }
-
-    public static class RequestTestInvocationContextProvider implements TestTemplateInvocationContextProvider {
-
-        public RequestTestInvocationContextProvider() {}
-
-        @Override
-        public boolean supportsTestTemplate(ExtensionContext extensionContext) {
-            return true;
-        }
-
-        @Override
-        public Stream<TestTemplateInvocationContext> provideTestTemplateInvocationContexts(
-            ExtensionContext extensionContext
-        ) {
-            List<TestTemplateInvocationContext> contexts = new ArrayList<>();
-            for (TestService ts : testServices) {
-                URI endpoint = URI.create("http://localhost:" + ts.testPort);
-                for (TestOperation to : ts.operations()) {
-                    for (HttpRequestTestCase tc : to.requestTestCases()) {
-                        if (ONLY_RUN_THESE_TESTS.isEmpty() || ONLY_RUN_THESE_TESTS.contains(tc.getId())) {
-                            contexts.add(
-                                new RequestTestInvocationContext(
-                                    endpoint,
-                                    tc,
-                                    to.mock(),
-                                    to.inputBuilderSupplier(),
-                                    MANUAL_EXPECTATIONS.get(tc.getId())
-                                )
-                            );
-                        }
-                    }
-                }
-            }
-            return contexts.stream();
-        }
     }
 
     private static boolean testFilter(Shape s) {
@@ -393,6 +415,9 @@ public class EndToEndProtocolTests {
                     outputBuilderSupplier,
                     operationShape.getTrait(HttpResponseTestsTrait.class)
                         .map(hrt -> hrt.getTestCasesFor(AppliesTo.SERVER))
+                        .orElse(Collections.emptyList()),
+                    operationShape.getTrait(HttpMalformedRequestTestsTrait.class)
+                        .map(HttpMalformedRequestTestsTrait::getTestCases)
                         .orElse(Collections.emptyList())
                 )
             );
@@ -423,6 +448,42 @@ public class EndToEndProtocolTests {
             Supplier.class,
             builder
         );
+    }
+
+    public static class RequestTestInvocationContextProvider implements TestTemplateInvocationContextProvider {
+
+        public RequestTestInvocationContextProvider() {}
+
+        @Override
+        public boolean supportsTestTemplate(ExtensionContext extensionContext) {
+            return true;
+        }
+
+        @Override
+        public Stream<TestTemplateInvocationContext> provideTestTemplateInvocationContexts(
+            ExtensionContext extensionContext
+        ) {
+            List<TestTemplateInvocationContext> contexts = new ArrayList<>();
+            for (TestService ts : testServices) {
+                URI endpoint = URI.create("http://localhost:" + ts.testPort);
+                for (TestOperation to : ts.operations()) {
+                    for (HttpRequestTestCase tc : to.requestTestCases()) {
+                        if (ONLY_RUN_THESE_TESTS.isEmpty() || ONLY_RUN_THESE_TESTS.contains(tc.getId())) {
+                            contexts.add(
+                                new RequestTestInvocationContext(
+                                    endpoint,
+                                    tc,
+                                    to.mock(),
+                                    to.inputBuilderSupplier(),
+                                    MANUAL_EXPECTATIONS.get(tc.getId())
+                                )
+                            );
+                        }
+                    }
+                }
+            }
+            return contexts.stream();
+        }
     }
 
     public static class ResponseTestInvocationContextProvider implements TestTemplateInvocationContextProvider {
@@ -463,6 +524,40 @@ public class EndToEndProtocolTests {
         }
     }
 
+    public static class MalformedRequestTestInvocationContextProvider implements TestTemplateInvocationContextProvider {
+
+        public MalformedRequestTestInvocationContextProvider() {}
+
+        @Override
+        public boolean supportsTestTemplate(ExtensionContext extensionContext) {
+            return true;
+        }
+
+        @Override
+        public Stream<TestTemplateInvocationContext> provideTestTemplateInvocationContexts(
+            ExtensionContext extensionContext
+        ) {
+            List<TestTemplateInvocationContext> contexts = new ArrayList<>();
+            for (TestService ts : testServices) {
+                URI endpoint = URI.create("http://localhost:" + ts.testPort);
+                for (TestOperation to : ts.operations()) {
+                    for (HttpMalformedRequestTestCase tc : to.malformedTestCases()) {
+                        if (ONLY_RUN_THESE_TESTS.isEmpty() || ONLY_RUN_THESE_TESTS.contains(tc.getId())) {
+                            contexts.add(
+                                new MalformedRequestTestInvocationContext(
+                                    endpoint,
+                                    tc,
+                                    to.mock()
+                                )
+                            );
+                        }
+                    }
+                }
+            }
+            return contexts.stream();
+        }
+    }
+
     record ServiceCoordinate(ShapeId serviceId, ShapeId operationId) {}
 
     record HttpRequest(
@@ -479,7 +574,8 @@ public class EndToEndProtocolTests {
         Supplier<ShapeBuilder<?>> inputBuilderSupplier,
         List<HttpRequestTestCase> requestTestCases,
         Supplier<ShapeBuilder<?>> outputBuilderSupplier,
-        List<HttpResponseTestCase> responseTestCases
+        List<HttpResponseTestCase> responseTestCases,
+        List<HttpMalformedRequestTestCase> malformedTestCases
     ) {}
 
     private record TestService(

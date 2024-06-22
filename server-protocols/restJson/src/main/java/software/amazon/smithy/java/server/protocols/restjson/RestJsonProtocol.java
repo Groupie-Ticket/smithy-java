@@ -24,6 +24,7 @@ import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.EventStreamFrameEncodingProcessor;
+import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.http.api.SmithyHttpRequest;
 import software.amazon.smithy.java.runtime.http.binding.AwsFlowFrame;
 import software.amazon.smithy.java.runtime.http.binding.AwsFlowFrameEncoder;
@@ -45,6 +46,7 @@ import software.amazon.smithy.java.server.core.ShapeValue;
 import software.amazon.smithy.java.server.core.Value;
 import software.amazon.smithy.java.server.core.attributes.HttpAttributes;
 import software.amazon.smithy.java.server.exceptions.InternalServerException;
+import software.amazon.smithy.java.server.exceptions.SyntheticExceptions;
 import software.amazon.smithy.java.server.protocols.restjson.router.UriMatcherMap;
 import software.amazon.smithy.java.server.protocols.restjson.router.UriTreeMatcherMap;
 import software.amazon.smithy.java.server.protocols.restjson.router.UrlEncoder;
@@ -150,16 +152,25 @@ public final class RestJsonProtocol extends ServerProtocol {
             deser.deserialize().get();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new RuntimeException(e);
+            throw handleException(e);
         } catch (ExecutionException e) {
-            if (e.getCause() instanceof RuntimeException re) {
-                throw re;
-            }
-            throw new RuntimeException(e.getCause());
+            throw handleException(e.getCause());
+        } catch (RuntimeException e) {
+            throw handleException(e);
         }
 
         job.request().setValue(new ShapeValue<>(shapeBuilder.build()));
         return CompletableFuture.completedFuture(null);
+    }
+
+    private static RuntimeException handleException(Throwable t) {
+        if (t instanceof SerializationException se) {
+            throw new software.amazon.smithy.java.server.exceptions.SerializationException(se);
+        }
+        if (t instanceof ModeledApiException mse) {
+            throw mse;
+        }
+        throw new InternalServerException(t);
     }
 
     private DataStream getDataStream(Value value, HttpHeaders headers) {
@@ -182,19 +193,35 @@ public final class RestJsonProtocol extends ServerProtocol {
 
     @Override
     public CompletableFuture<Void> serializeOutput(Job job) {
+        return job.getFailure()
+            .map(t -> serializeError(job, t))
+            .orElseGet(() -> {
+                if (job.reply().getValue() instanceof ShapeValue<? extends SerializableStruct> shapeValue) {
+                    return serializeReply(job, shapeValue.get());
+                }
+                return serializeReply(
+                    job,
+                    new InternalServerException(
+                        new IllegalStateException(
+                            "Unrecognized return type: "
+                                + job.reply().getValue()
+                        )
+                    )
+                );
+            });
+
+    }
+
+    private CompletableFuture<Void> serializeReply(Job job, SerializableStruct value) {
         ApiOperation<?, ?> apiOperation = job.operation().getApiOperation();
-        ShapeValue<? extends SerializableStruct> shapeValue = job.reply().getValue();
         Schema schema;
-        SerializableStruct value = shapeValue.get();
         HttpErrorTrait errorTrait = null;
         if (value instanceof Exception e) {
-            if (e instanceof ModeledApiException me && (schema = apiOperation.exceptionSchema(me)) != null) {
-                errorTrait = schema.expectTrait(HttpErrorTrait.class);
-            } else {
-                schema = InternalServerException.SCHEMA;
-                value = new InternalServerException(e);
-                errorTrait = schema.expectTrait(HttpErrorTrait.class);
+            schema = getExceptionSchema(apiOperation, e);
+            if (schema == null) {
+                return serializeReply(job, new InternalServerException(e));
             }
+            errorTrait = schema.expectTrait(HttpErrorTrait.class);
         } else {
             schema = apiOperation.outputSchema();
         }
@@ -214,7 +241,7 @@ public final class RestJsonProtocol extends ServerProtocol {
         job.reply().context().put(HttpAttributes.HTTP_HEADERS, headers);
         job.reply().context().put(HttpAttributes.STATUS_CODE, responseStatus);
 
-        if (apiOperation instanceof OutputEventStreamingSdkOperation<?, ?, ?> outputStreamingOp) {
+        if (apiOperation instanceof OutputEventStreamingSdkOperation<?, ?, ?> outputStreamingOp && errorTrait == null) {
             EventStreamFrameEncodingProcessor<AwsFlowFrame, ?> stream = new EventStreamFrameEncodingProcessor<>(
                 serializer.getEventStream(),
                 new AwsFlowShapeEncoder<>(
@@ -224,17 +251,36 @@ public final class RestJsonProtocol extends ServerProtocol {
                 new AwsFlowFrameEncoder()
             );
             job.reply().setValue(new ReactiveByteValue(stream));
-        } else if (apiOperation.streamingOutput()) {
+        } else if (apiOperation.streamingOutput() && errorTrait == null) {
             job.reply().setValue(new ReactiveByteValue(serializer.getBody()));
         } else {
             DataStream dataStream = serializer.getBody();
             try {
                 job.reply().setValue(new ByteValue(dataStream.asBytes().toCompletableFuture().get()));
+                job.setFailure(null);
             } catch (InterruptedException | ExecutionException e) {
                 throw new RuntimeException(e);
             }
         }
         return CompletableFuture.completedFuture(null);
+    }
+
+    private static Schema getExceptionSchema(ApiOperation<?, ?> apiOperation, Exception e) {
+        if (e instanceof ModeledApiException mae) {
+            Schema s = apiOperation.exceptionSchema(mae);
+            if (s == null) {
+                return SyntheticExceptions.getSchema(mae.getShapeId()).orElse(null);
+            }
+            return s;
+        }
+        return null;
+    }
+
+    private CompletableFuture<Void> serializeError(Job job, Throwable t) {
+        if (t instanceof ModeledApiException mae) {
+            return serializeReply(job, mae);
+        }
+        return serializeReply(job, new InternalServerException(t));
     }
 
     private HttpHeaders addHeader(HttpHeaders headers, String name, String value) {

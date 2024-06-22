@@ -30,7 +30,7 @@ public final class ServerProtocolHandler implements Handler {
     @Override
     public CompletableFuture<Void> after(Job job) {
         // null check
-        if (job.reply().getValue() instanceof ShapeValue) {
+        if (job.reply().getValue() instanceof ShapeValue || job.getFailure().isPresent()) {
             try {
                 return job.chosenProtocol().serializeOutput(job);
             } catch (Throwable t) {

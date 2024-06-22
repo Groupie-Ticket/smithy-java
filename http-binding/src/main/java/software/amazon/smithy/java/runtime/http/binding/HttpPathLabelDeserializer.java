@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.TimestampFormatter;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
@@ -30,7 +31,7 @@ final class HttpPathLabelDeserializer implements ShapeDeserializer {
         return switch (value) {
             case "true" -> true;
             case "false" -> false;
-            default -> throw new IllegalStateException("Expected path label for " + schema.id() + " to be a boolean");
+            default -> throw new SerializationException("Invalid boolean");
         };
     }
 
@@ -39,51 +40,80 @@ final class HttpPathLabelDeserializer implements ShapeDeserializer {
         try {
             return Base64.getDecoder().decode(value.getBytes(StandardCharsets.UTF_8));
         } catch (IllegalArgumentException e) {
-            throw new IllegalStateException(
-                "Expected path label for " + schema.id() + " to be a blob, but the "
-                    + "value does not contain valid base64 encoded data"
-            );
+            throw new SerializationException("invalid base64", e);
         }
     }
 
     @Override
     public byte readByte(Schema schema) {
-        return Byte.parseByte(value);
+        try {
+            return Byte.parseByte(value);
+        } catch (NumberFormatException e) {
+            throw new SerializationException("Invalid byte", e);
+        }
     }
 
     @Override
     public short readShort(Schema schema) {
-        return Short.parseShort(value);
+        try {
+            return Short.parseShort(value);
+        } catch (NumberFormatException e) {
+            throw new SerializationException("Invalid short", e);
+        }
     }
 
     @Override
     public int readInteger(Schema schema) {
-        return Integer.parseInt(value);
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            throw new SerializationException("Invalid integer", e);
+        }
     }
 
     @Override
     public long readLong(Schema schema) {
-        return Long.parseLong(value);
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException e) {
+            throw new SerializationException("Invalid long", e);
+        }
     }
 
     @Override
     public float readFloat(Schema schema) {
-        return Float.parseFloat(value);
+        try {
+            return Float.parseFloat(value);
+        } catch (NumberFormatException e) {
+            throw new SerializationException("Invalid float", e);
+        }
     }
 
     @Override
     public double readDouble(Schema schema) {
-        return Double.parseDouble(value);
+        try {
+            return Double.parseDouble(value);
+        } catch (NumberFormatException e) {
+            throw new SerializationException("Invalid double", e);
+        }
     }
 
     @Override
     public BigInteger readBigInteger(Schema schema) {
-        return new BigInteger(value);
+        try {
+            return new BigInteger(value);
+        } catch (NumberFormatException e) {
+            throw new SerializationException("Invalid BigInteger", e);
+        }
     }
 
     @Override
     public BigDecimal readBigDecimal(Schema schema) {
-        return new BigDecimal(value);
+        try {
+            return new BigDecimal(value);
+        } catch (NumberFormatException e) {
+            throw new SerializationException("Invalid BigDecimal", e);
+        }
     }
 
     @Override
