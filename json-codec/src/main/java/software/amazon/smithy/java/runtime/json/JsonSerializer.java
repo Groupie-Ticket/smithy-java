@@ -47,7 +47,7 @@ final class JsonSerializer implements ShapeSerializer {
     public void flush() {
         try {
             stream.flush();
-        } catch (JsonException | IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
@@ -58,7 +58,7 @@ final class JsonSerializer implements ShapeSerializer {
             stream.close();
             returnHandle.accept(stream);
             stream = null;
-        } catch (JsonException | IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
@@ -67,7 +67,7 @@ final class JsonSerializer implements ShapeSerializer {
     public void writeBoolean(Schema schema, boolean value) {
         try {
             stream.writeVal(value);
-        } catch (JsonException | IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
@@ -76,7 +76,7 @@ final class JsonSerializer implements ShapeSerializer {
     public void writeByte(Schema schema, byte value) {
         try {
             stream.writeVal(value);
-        } catch (JsonException | IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
@@ -85,7 +85,7 @@ final class JsonSerializer implements ShapeSerializer {
     public void writeShort(Schema schema, short value) {
         try {
             stream.writeVal(value);
-        } catch (JsonException | IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
@@ -94,7 +94,7 @@ final class JsonSerializer implements ShapeSerializer {
     public void writeBlob(Schema schema, byte[] value) {
         try {
             stream.writeVal(Base64.getEncoder().encodeToString(value));
-        } catch (JsonException | IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
@@ -103,7 +103,7 @@ final class JsonSerializer implements ShapeSerializer {
     public void writeInteger(Schema schema, int value) {
         try {
             stream.writeVal(value);
-        } catch (JsonException | IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
@@ -112,7 +112,7 @@ final class JsonSerializer implements ShapeSerializer {
     public void writeLong(Schema schema, long value) {
         try {
             stream.writeVal(value);
-        } catch (JsonException | IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
@@ -131,7 +131,7 @@ final class JsonSerializer implements ShapeSerializer {
             } else {
                 stream.writeVal(value);
             }
-        } catch (JsonException | IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
@@ -150,7 +150,7 @@ final class JsonSerializer implements ShapeSerializer {
             } else {
                 stream.writeVal(value);
             }
-        } catch (JsonException | IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
@@ -159,7 +159,7 @@ final class JsonSerializer implements ShapeSerializer {
     public void writeBigInteger(Schema schema, BigInteger value) {
         try {
             stream.writeVal(value);
-        } catch (JsonException | IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
@@ -168,7 +168,7 @@ final class JsonSerializer implements ShapeSerializer {
     public void writeBigDecimal(Schema schema, BigDecimal value) {
         try {
             stream.writeVal(value);
-        } catch (JsonException | IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
@@ -177,7 +177,7 @@ final class JsonSerializer implements ShapeSerializer {
     public void writeString(Schema schema, String value) {
         try {
             stream.writeVal(value);
-        } catch (JsonException | IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
@@ -193,7 +193,7 @@ final class JsonSerializer implements ShapeSerializer {
             stream.writeObjectStart();
             struct.serializeMembers(new JsonStructSerializer(this, true));
             stream.writeObjectEnd();
-        } catch (JsonException | IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
@@ -204,7 +204,7 @@ final class JsonSerializer implements ShapeSerializer {
             stream.writeArrayStart();
             consumer.accept(listState, new ListSerializer(this, this::writeComma));
             stream.writeArrayEnd();
-        } catch (JsonException | IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
@@ -213,8 +213,8 @@ final class JsonSerializer implements ShapeSerializer {
         if (position > 0) {
             try {
                 stream.writeMore();
-            } catch (JsonException | IOException e) {
-                throw new RuntimeException(e);
+            } catch (Exception e) {
+                throw new SerializationException(e);
             }
         }
     }
@@ -225,7 +225,7 @@ final class JsonSerializer implements ShapeSerializer {
             stream.writeObjectStart();
             consumer.accept(mapState, new JsonMapSerializer(this, stream));
             stream.writeObjectEnd();
-        } catch (JsonException | IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
@@ -245,7 +245,7 @@ final class JsonSerializer implements ShapeSerializer {
                         stream.writeVal(schema.id().toString());
                         struct.serializeMembers(new JsonStructSerializer(JsonSerializer.this, false));
                         stream.writeObjectEnd();
-                    } catch (IOException | JsonException e) {
+                    } catch (Exception e) {
                         throw new SerializationException(e);
                     }
                 }
@@ -257,7 +257,7 @@ final class JsonSerializer implements ShapeSerializer {
     public void writeNull(Schema schema) {
         try {
             stream.writeNull();
-        } catch (JsonException | IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
