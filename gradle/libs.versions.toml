@@ -10,6 +10,7 @@ spotless = "6.25.0"
 smithy-gradle = "1.0.0"
 assertj = "3.25.1"
 netty = "4.1.109.Final"
+shadow = "8.1.1"
 
 [libraries]
 smithy-model = { module = "software.amazon.smithy:smithy-model", version.ref = "smithy" }
@@ -40,3 +41,4 @@ smithy-gradle-base = { module = "software.amazon.smithy.gradle:smithy-base", ver
 
 [plugins]
 jmh = { id = "me.champeau.jmh", version.ref = "jmh" }
+shadow = { id = "com.github.johnrengelman.shadow", version.ref =  "shadow"}

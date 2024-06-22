@@ -5,9 +5,8 @@ plugins {
 description = "This module provides the core server functionality"
 
 extra["displayName"] = "Smithy :: Java :: Server Core"
-extra["moduleName"] = "software.amazon.smithy.java.server-core"
+extra["moduleName"] = "software.amazon.smithy.java.server.core"
 
 dependencies {
-    api(project(":core"))
     api(project(":server"))
 }
