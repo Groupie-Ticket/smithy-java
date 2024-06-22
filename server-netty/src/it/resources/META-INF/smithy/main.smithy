@@ -25,6 +25,11 @@ operation GetBeer {
         @required
         @idx(1)
         id: Long
+
+        @required
+        @idx(2)
+        name: String
+
     }
     output:= {
         @required
