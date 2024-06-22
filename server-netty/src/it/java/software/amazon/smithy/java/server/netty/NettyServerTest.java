@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Flow;
 import java.util.zip.GZIPOutputStream;
-import org.junit.jupiter.api.Test;
 import smithy.java.codegen.server.test.model.Beer;
 import smithy.java.codegen.server.test.model.BuzzEvent;
 import smithy.java.codegen.server.test.model.DependencyException;
@@ -38,7 +37,6 @@ import smithy.java.codegen.server.test.model.HashFileOutput;
 import smithy.java.codegen.server.test.model.MalformedInputException;
 import smithy.java.codegen.server.test.model.NegativeNumberException;
 import smithy.java.codegen.server.test.model.NoSuchBeerException;
-import smithy.java.codegen.server.test.model.Value;
 import smithy.java.codegen.server.test.model.ValueStream;
 import smithy.java.codegen.server.test.model.ZipFileInput;
 import smithy.java.codegen.server.test.model.ZipFileOutput;
@@ -143,9 +141,11 @@ class NettyServerTest {
                 return Flowable.empty();
             } else if (notification.isOnError()) {
                 if (notification.getError() instanceof SerializationException se) {
-                    return Flowable.error(MalformedInputException.builder()
-                        .message("Failed to decode event")
-                        .build());
+                    return Flowable.error(
+                        MalformedInputException.builder()
+                            .message("Failed to decode event")
+                            .build()
+                    );
                 } else {
                     return Flowable.error(notification.getError());
                 }
@@ -158,7 +158,9 @@ class NettyServerTest {
 
             Long value = event.Value().value();
             if (value == null || value < 0) {
-                return Flowable.error(NegativeNumberException.builder().message(value == null ? "null" : Long.toString(value)).build());
+                return Flowable.error(
+                    NegativeNumberException.builder().message(value == null ? "null" : Long.toString(value)).build()
+                );
             }
 
             List<FizzBuzzStream> eventsToSend = new ArrayList<>(2);

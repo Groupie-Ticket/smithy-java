@@ -11,7 +11,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.Flow;
 import software.amazon.smithy.java.kestrel.KestrelDeserializer;
 import software.amazon.smithy.java.kestrel.codec.KestrelCodec;
@@ -113,7 +112,10 @@ final class RpcV2KestrelProtocol extends ServerProtocol {
                 if (e != null) {
                     SerializableStruct failure;
                     if (e instanceof NoInitialEventException) {
-                        failure = new software.amazon.smithy.java.server.exceptions.SerializationException("No initial event received", e);
+                        failure = new software.amazon.smithy.java.server.exceptions.SerializationException(
+                            "No initial event received",
+                            e
+                        );
                     } else if (e instanceof SerializableStruct struct) {
                         failure = struct;
                     } else {
@@ -131,7 +133,12 @@ final class RpcV2KestrelProtocol extends ServerProtocol {
             });
         } else {
             ByteValue byteValue = job.request().getValue();
-            SerializableStruct input = codec.decode(ByteBuffer.wrap(byteValue.get()));
+            SerializableStruct input;
+            try {
+                input = codec.decode(ByteBuffer.wrap(byteValue.get()));
+            } catch (Exception e) {
+                throw new software.amazon.smithy.java.server.exceptions.SerializationException(e);
+            }
             job.request().setValue(new ShapeValue<>(input));
             return CompletableFuture.completedFuture(null);
         }

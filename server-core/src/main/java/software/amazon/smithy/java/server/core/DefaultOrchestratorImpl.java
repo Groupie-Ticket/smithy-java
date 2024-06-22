@@ -5,8 +5,6 @@
 
 package software.amazon.smithy.java.server.core;
 
-import software.amazon.smithy.java.server.Service;
-
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -17,6 +15,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
+import software.amazon.smithy.java.server.Service;
 
 public class DefaultOrchestratorImpl implements Orchestrator {
     private static final System.Logger LOGGER = System.getLogger(DefaultOrchestratorImpl.class.getName());

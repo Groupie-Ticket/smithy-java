@@ -7,7 +7,6 @@ package software.amazon.smithy.java.runtime.json;
 
 import com.jsoniter.JsonIterator;
 import com.jsoniter.ValueType;
-import com.jsoniter.spi.JsonException;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
