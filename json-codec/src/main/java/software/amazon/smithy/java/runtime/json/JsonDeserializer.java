@@ -48,7 +48,7 @@ final class JsonDeserializer implements ShapeDeserializer {
         try {
             String content = iter.readString();
             return Base64.getDecoder().decode(content);
-        } catch (JsonException | IOException | IllegalArgumentException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
@@ -57,7 +57,7 @@ final class JsonDeserializer implements ShapeDeserializer {
     public byte readByte(Schema schema) {
         try {
             return (byte) iter.readShort();
-        } catch (JsonException | IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
@@ -66,7 +66,7 @@ final class JsonDeserializer implements ShapeDeserializer {
     public short readShort(Schema schema) {
         try {
             return iter.readShort();
-        } catch (JsonException | IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
@@ -75,7 +75,7 @@ final class JsonDeserializer implements ShapeDeserializer {
     public int readInteger(Schema schema) {
         try {
             return iter.readInt();
-        } catch (JsonException | IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
@@ -84,7 +84,7 @@ final class JsonDeserializer implements ShapeDeserializer {
     public long readLong(Schema schema) {
         try {
             return iter.readLong();
-        } catch (JsonException | IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
@@ -101,7 +101,7 @@ final class JsonDeserializer implements ShapeDeserializer {
                 };
             }
             return iter.readFloat();
-        } catch (JsonException | IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
@@ -118,7 +118,7 @@ final class JsonDeserializer implements ShapeDeserializer {
                 };
             }
             return iter.readDouble();
-        } catch (JsonException | IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
@@ -127,7 +127,7 @@ final class JsonDeserializer implements ShapeDeserializer {
     public BigInteger readBigInteger(Schema schema) {
         try {
             return iter.readBigInteger();
-        } catch (JsonException | IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
@@ -136,7 +136,7 @@ final class JsonDeserializer implements ShapeDeserializer {
     public BigDecimal readBigDecimal(Schema schema) {
         try {
             return iter.readBigDecimal();
-        } catch (JsonException | IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
@@ -145,7 +145,7 @@ final class JsonDeserializer implements ShapeDeserializer {
     public String readString(Schema schema) {
         try {
             return iter.readString();
-        } catch (JsonException | IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
@@ -154,7 +154,7 @@ final class JsonDeserializer implements ShapeDeserializer {
     public boolean readBoolean(Schema schema) {
         try {
             return iter.readBoolean();
-        } catch (JsonException | IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
@@ -169,7 +169,7 @@ final class JsonDeserializer implements ShapeDeserializer {
             } else {
                 return new JsonDocument(any, fieldMapper, timestampResolver);
             }
-        } catch (JsonException | IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
@@ -179,7 +179,7 @@ final class JsonDeserializer implements ShapeDeserializer {
         try {
             var format = timestampResolver.resolve(schema);
             return TimestampResolver.readTimestamp(iter.readAny(), format);
-        } catch (JsonException | IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
@@ -195,7 +195,7 @@ final class JsonDeserializer implements ShapeDeserializer {
                     structMemberConsumer.accept(state, member, this);
                 }
             }
-        } catch (JsonException | IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
@@ -206,7 +206,7 @@ final class JsonDeserializer implements ShapeDeserializer {
             while (iter.readArray()) {
                 listMemberConsumer.accept(state, this);
             }
-        } catch (JsonException | IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
@@ -217,7 +217,7 @@ final class JsonDeserializer implements ShapeDeserializer {
             for (var field = iter.readObject(); field != null; field = iter.readObject()) {
                 mapMemberConsumer.accept(state, field, this);
             }
-        } catch (JsonException | IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }
