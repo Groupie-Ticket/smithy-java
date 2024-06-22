@@ -9,6 +9,6 @@ package software.amazon.smithy.java.server.core;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
-public interface Orchestrator extends Executor {
+public sealed interface Orchestrator extends Executor permits DefaultOrchestratorImpl {
     CompletableFuture<Job> enqueue(Job job);
 }
