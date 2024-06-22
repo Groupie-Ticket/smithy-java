@@ -13,12 +13,16 @@ import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.HttpServerUpgradeHandler;
 import io.netty.handler.codec.http2.*;
+import io.netty.handler.logging.LogLevel;
 import io.netty.util.ReferenceCountUtil;
 import java.util.List;
 import java.util.function.Consumer;
 
 
 final class NettyChannelInitializer extends ChannelInitializer<Channel> {
+
+    private static final System.Logger WIRE = System.getLogger("WIRE");
+    private static final boolean WIRE_ENABLED = WIRE.isLoggable(System.Logger.Level.INFO);
 
     private final Consumer<ChannelPipeline> handlerInstaller;
 
@@ -31,7 +35,11 @@ final class NettyChannelInitializer extends ChannelInitializer<Channel> {
     protected void initChannel(Channel channel) throws Exception {
         ChannelPipeline pipeline = channel.pipeline();
 
-        pipeline.addLast(getUpgradeHandler(new HttpServerCodec(), Http2FrameCodecBuilder.forServer().build()));
+        Http2FrameCodecBuilder codecBuilder = Http2FrameCodecBuilder.forServer();
+        if (WIRE_ENABLED) {
+            codecBuilder.frameLogger(new Http2FrameLogger(LogLevel.INFO, "WIRE"));
+        }
+        pipeline.addLast(getUpgradeHandler(new HttpServerCodec(), codecBuilder.build()));
         installUpgradeListener(pipeline, new Http2MultiplexHandler(new H2ChannelInitializer(handlerInstaller)));
         handlerInstaller.accept(pipeline);
         pipeline.read();

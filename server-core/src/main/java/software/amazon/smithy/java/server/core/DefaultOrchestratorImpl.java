@@ -11,13 +11,10 @@ import java.util.Collections;
 import java.util.Deque;
 import java.util.List;
 import java.util.Queue;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.*;
 import software.amazon.smithy.java.server.Service;
 
-public class DefaultOrchestratorImpl implements Orchestrator {
+public final class DefaultOrchestratorImpl implements Orchestrator {
     private static final System.Logger LOGGER = System.getLogger(DefaultOrchestratorImpl.class.getName());
 
     private final List<Handler> handlers;
@@ -28,7 +25,7 @@ public class DefaultOrchestratorImpl implements Orchestrator {
         this.handlers = Collections.unmodifiableList(assembleHandlers(service, endpointHandlers));
         this.numberOfWorkers = numberOfWorkers;
         this.queue = new LinkedBlockingQueue<>();
-        var es = Executors.newFixedThreadPool(numberOfWorkers);
+        var es = Executors.newFixedThreadPool(numberOfWorkers, new ServerThreadFactory("orchestrator", true));
         for (int i = 0; i < numberOfWorkers; i++) {
             es.submit(new ConsumerTask(queue));
         }
