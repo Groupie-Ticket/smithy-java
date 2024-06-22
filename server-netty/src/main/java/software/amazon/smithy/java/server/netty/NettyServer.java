@@ -60,10 +60,7 @@ final class NettyServer implements Server {
 
         this.bootstrap = bootstrap;
         this.endpoint = builder.defaultEndpoint;
-
-
     }
-
 
     @Override
     public void start() {

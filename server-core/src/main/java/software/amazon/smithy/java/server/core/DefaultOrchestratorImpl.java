@@ -5,6 +5,8 @@
 
 package software.amazon.smithy.java.server.core;
 
+import software.amazon.smithy.java.server.Service;
+
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -15,9 +17,9 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
-import software.amazon.smithy.java.server.Service;
 
 public class DefaultOrchestratorImpl implements Orchestrator {
+    private static final System.Logger LOGGER = System.getLogger(DefaultOrchestratorImpl.class.getName());
 
     private final List<Handler> handlers;
     private final BlockingQueue<Runnable> queue;
@@ -31,7 +33,6 @@ public class DefaultOrchestratorImpl implements Orchestrator {
         for (int i = 0; i < numberOfWorkers; i++) {
             es.submit(new ConsumerTask(queue));
         }
-
     }
 
     @Override
@@ -46,7 +47,6 @@ public class DefaultOrchestratorImpl implements Orchestrator {
         handlers.add(new HttpHandler());
         handlers.add(new ServerProtocolHandler());
         handlers.add(new OperationHandler(service));
-//        return handlers.stream().map(LoggingHandler::new).map(Handler.class::cast).toList();
         return handlers;
     }
 
@@ -166,31 +166,8 @@ public class DefaultOrchestratorImpl implements Orchestrator {
             } catch (InterruptedException ignored) {
                 Thread.currentThread().interrupt();
             } catch (Throwable t) {
-                new Throwable("Unhandled exception in orchestrator", t).printStackTrace();
+                LOGGER.log(System.Logger.Level.ERROR, "Orchestrator task threw an exception", t);
             }
         }
     }
-
-    private static final class LoggingHandler implements Handler {
-
-        private final Handler delegate;
-
-        private LoggingHandler(Handler delegate) {
-            this.delegate = delegate;
-        }
-
-        @Override
-        public CompletableFuture<Void> before(Job job) {
-            System.out.println("Before : " + delegate.getClass().getSimpleName());
-            return delegate.before(job);
-        }
-
-        @Override
-        public CompletableFuture<Void> after(Job job) {
-            System.out.println("After : " + delegate.getClass().getSimpleName());
-            return delegate.after(job);
-        }
-    }
-
-
 }

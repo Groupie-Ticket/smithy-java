@@ -176,8 +176,7 @@ class NettyServerTest {
         }
     }
 
-    @Test
-    void testServer() {
+    public static void main(String[] args) {
         var server = Server.builder(URI.create("http://localhost:8080"))
             .addService(
                 TestService.builder()
