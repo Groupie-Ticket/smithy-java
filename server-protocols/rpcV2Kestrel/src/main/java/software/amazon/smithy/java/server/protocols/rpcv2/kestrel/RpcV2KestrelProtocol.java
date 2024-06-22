@@ -25,6 +25,8 @@ import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.serde.NoInitialEventException;
+import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.server.Service;
 import software.amazon.smithy.java.server.core.ByteValue;
 import software.amazon.smithy.java.server.core.Job;
@@ -37,6 +39,7 @@ import software.amazon.smithy.java.server.core.Value;
 import software.amazon.smithy.java.server.core.attributes.HttpAttributes;
 import software.amazon.smithy.java.server.core.http.HttpMethod;
 import software.amazon.smithy.java.server.exceptions.InternalServerException;
+import software.amazon.smithy.java.server.exceptions.SyntheticExceptions;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.HttpErrorTrait;
 import software.amazon.smithy.utils.Pair;
@@ -107,10 +110,23 @@ final class RpcV2KestrelProtocol extends ServerProtocol {
             publisher = initialEventDecoder;
             final var finalPublisher = publisher;
             return initialEventCallback.handle((buffer, e) -> {
-                if (e != null) throw new CompletionException(e);
-                var mapped = new KestrelStreamDeserializer(finalPublisher, codec);
-                var initialEvent = codec.decodeInitialRequest(buffer, mapped);
-                job.request().setValue(new ShapeValue<>(initialEvent));
+                if (e != null) {
+                    SerializableStruct failure;
+                    if (e instanceof NoInitialEventException) {
+                        failure = new software.amazon.smithy.java.server.exceptions.SerializationException("No initial event received", e);
+                    } else if (e instanceof SerializableStruct struct) {
+                        failure = struct;
+                    } else {
+                        failure = new InternalServerException(e);
+                    }
+
+                    job.reply().setValue(new ShapeValue<>(failure));
+                    job.setDone();
+                } else {
+                    var mapped = new KestrelStreamDeserializer(finalPublisher, codec);
+                    var initialEvent = codec.decodeInitialRequest(buffer, mapped);
+                    job.request().setValue(new ShapeValue<>(initialEvent));
+                }
                 return null;
             });
         } else {
@@ -119,6 +135,14 @@ final class RpcV2KestrelProtocol extends ServerProtocol {
             job.request().setValue(new ShapeValue<>(input));
             return CompletableFuture.completedFuture(null);
         }
+    }
+
+    private static Schema tryResolveExceptionSchema(ModeledApiException me, ApiOperation operation) {
+        Schema s = operation.exceptionSchema(me);
+        if (s == null) {
+            s = SyntheticExceptions.getSchema(me.getShapeId()).orElse(null);
+        }
+        return s;
     }
 
     @Override
@@ -136,7 +160,7 @@ final class RpcV2KestrelProtocol extends ServerProtocol {
             HttpErrorTrait errorTrait;
             Schema schema;
             byte[] serialized;
-            if (e instanceof ModeledApiException me && (schema = apiOperation.exceptionSchema(me)) != null) {
+            if (e instanceof ModeledApiException me && (schema = tryResolveExceptionSchema(me, apiOperation)) != null) {
                 errorTrait = schema.getTrait(HttpErrorTrait.class);
                 serialized = codec.encodeException(schema, e);
             } else {
@@ -204,10 +228,8 @@ final class RpcV2KestrelProtocol extends ServerProtocol {
                     // the completion notification from the request publisher
                     upstreamSubscription.request(1);
                 }
-            } catch (Throwable t) {
-                // TODO: translate error
-                upstreamSubscription.cancel();
-                onError(t);
+            } catch (Exception e) {
+                onError(new SerializationException("Malformed event", e));
             }
         }
 
@@ -260,7 +282,7 @@ final class RpcV2KestrelProtocol extends ServerProtocol {
                 upstreamSubscription.cancel();
                 // that include a SerializationException as a possible event.
                 // TODO: translate error
-                downstream.onError(new RuntimeException("Malformed event", e));
+                downstream.onError(new SerializationException("Malformed event", e));
                 return;
             }
 

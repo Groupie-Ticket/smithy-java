@@ -68,8 +68,8 @@ public final class EventStreamFrameDecodingProcessor<F extends Frame<?>, T exten
 
         try {
             decoder.decode(toRead).stream().map(eventDecoder::decode).forEach(queue::add);
-        } catch (Throwable t) {
-            onError(t);
+        } catch (Exception e) {
+            onError(new SerializationException("Malformed event", e));
             return;
         }
 

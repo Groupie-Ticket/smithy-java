@@ -39,7 +39,11 @@ public class SerializationException extends ModeledApiException {
         .build();
 
     public SerializationException(Throwable cause) {
-        super(ID, "SerializationException", cause);
+        this("SerializationException", cause);
+    }
+
+    public SerializationException(String message, Throwable cause) {
+        super(ID, message, cause);
     }
 
     @Override

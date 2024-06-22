@@ -35,8 +35,10 @@ import smithy.java.codegen.server.test.model.GetBeerInput;
 import smithy.java.codegen.server.test.model.GetBeerOutput;
 import smithy.java.codegen.server.test.model.HashFileInput;
 import smithy.java.codegen.server.test.model.HashFileOutput;
+import smithy.java.codegen.server.test.model.MalformedInputException;
 import smithy.java.codegen.server.test.model.NegativeNumberException;
 import smithy.java.codegen.server.test.model.NoSuchBeerException;
+import smithy.java.codegen.server.test.model.Value;
 import smithy.java.codegen.server.test.model.ValueStream;
 import smithy.java.codegen.server.test.model.ZipFileInput;
 import smithy.java.codegen.server.test.model.ZipFileOutput;
@@ -47,6 +49,7 @@ import smithy.java.codegen.server.test.service.HashFileOperation;
 import smithy.java.codegen.server.test.service.TestService;
 import smithy.java.codegen.server.test.service.ZipFileOperation;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
+import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.server.RequestContext;
 import software.amazon.smithy.java.server.Server;
 
@@ -135,16 +138,27 @@ class NettyServerTest {
             );
         }
 
-        private static Flowable<FizzBuzzStream> getFizzyBuzzyFlowable(Notification<ValueStream> event) {
-            if (event.isOnComplete()) {
+        private static Flowable<FizzBuzzStream> getFizzyBuzzyFlowable(Notification<ValueStream> notification) {
+            if (notification.isOnComplete()) {
                 return Flowable.empty();
-            } else if (event.isOnError()) {
-                return Flowable.error(event.getError());
+            } else if (notification.isOnError()) {
+                if (notification.getError() instanceof SerializationException se) {
+                    return Flowable.error(MalformedInputException.builder()
+                        .message("Failed to decode event")
+                        .build());
+                } else {
+                    return Flowable.error(notification.getError());
+                }
             }
 
-            long value = event.getValue().Value().value();
-            if (value < 0) {
-                return Flowable.error(NegativeNumberException.builder().message(Long.toString(value)).build());
+            var event = notification.getValue();
+            if (event.type() == ValueStream.Type.$UNKNOWN) {
+                return Flowable.error(MalformedInputException.builder().message("Failed to decode event").build());
+            }
+
+            Long value = event.Value().value();
+            if (value == null || value < 0) {
+                return Flowable.error(NegativeNumberException.builder().message(value == null ? "null" : Long.toString(value)).build());
             }
 
             List<FizzBuzzStream> eventsToSend = new ArrayList<>(2);
