@@ -155,11 +155,6 @@ final class RequestBodyPublisher implements Flow.Publisher<ByteBuffer> {
             try {
                 for (int i = 0; i < toWrite; i++) {
                     var event = queue.poll();
-                    if (event == null) {
-                        // should never happen
-                        System.err.println("!!! we got a null poll!");
-                        break;
-                    }
                     written--;
                     if (event instanceof ByteBuffer buf) {
                         sub.onNext(buf);
