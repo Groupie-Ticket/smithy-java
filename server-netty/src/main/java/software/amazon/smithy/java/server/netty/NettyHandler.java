@@ -23,6 +23,19 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
+import java.io.ByteArrayOutputStream;
+import java.lang.System.Logger.Level;
+import java.net.URI;
+import java.net.http.HttpHeaders;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Flow;
+import java.util.concurrent.atomic.AtomicReference;
 import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
 import software.amazon.smithy.java.server.core.ByteValue;
 import software.amazon.smithy.java.server.core.Job;
@@ -41,20 +54,6 @@ import software.amazon.smithy.java.server.core.Value;
 import software.amazon.smithy.java.server.core.attributes.HttpAttributes;
 import software.amazon.smithy.java.server.core.http.HttpMethod;
 import software.amazon.smithy.java.server.exceptions.UnknownOperationException;
-
-import java.io.ByteArrayOutputStream;
-import java.lang.System.Logger.Level;
-import java.net.URI;
-import java.net.http.HttpHeaders;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Flow;
-import java.util.concurrent.atomic.AtomicReference;
 
 final class NettyHandler extends ChannelDuplexHandler {
     private static final System.Logger LOGGER = System.getLogger(NettyHandler.class.getName());
@@ -256,7 +255,11 @@ final class NettyHandler extends ChannelDuplexHandler {
 
                                 @Override
                                 public void onError(Throwable throwable) {
-                                    LOGGER.log(Level.ERROR, "Response publisher signaled error, closing channel", throwable);
+                                    LOGGER.log(
+                                        Level.ERROR,
+                                        "Response publisher signaled error, closing channel",
+                                        throwable
+                                    );
                                     channel.close();
                                 }
 
