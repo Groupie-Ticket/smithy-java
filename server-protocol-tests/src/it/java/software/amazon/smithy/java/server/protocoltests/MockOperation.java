@@ -28,12 +28,27 @@ final class MockOperation implements BiFunction<Object, RequestContext, Object> 
 
     Supplier<Object> expectRequest() {
         return () -> {
-            if (lastOperation != operationId) {
-                Assertions.fail("Expected " + operationId + " to be invoked, was " + lastOperation);
-            }
             try {
+                if (lastOperation != operationId) {
+                    Assertions.fail("Expected " + operationId + " to be invoked, was " + lastOperation);
+                }
                 return lastRequest;
             } finally {
+                lastRequest = null;
+                lastOperation = null;
+            }
+        };
+    }
+
+    Supplier<Object> rejectRequest() {
+        return () -> {
+            try {
+                if (lastOperation != null) {
+                    Assertions.fail("Expected no operation to be invoked, but " + lastOperation + " was.");
+                }
+                return lastRequest;
+            } finally {
+                lastRequest = null;
                 lastOperation = null;
             }
         };

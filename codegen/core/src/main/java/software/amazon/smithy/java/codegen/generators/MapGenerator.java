@@ -14,6 +14,7 @@ import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
+import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.model.traits.SparseTrait;
@@ -64,10 +65,12 @@ public class MapGenerator
 
                             @Override
                             public void accept(${value:B} values, ${shapeSerializer:T} serializer) {
-                                ${?sparse}if (values == null) {
+                                if (values == null) {
+                                    ${?sparse}
                                     serializer.writeNull(${valueSchema:L});
+                                    ${/sparse}
                                     return;
-                                }${/sparse}
+                                }
                                 ${memberSerializer:C|};
                             }
                         }
@@ -83,10 +86,15 @@ public class MapGenerator
 
                             @Override
                             public void accept(${shape:B} state, ${key:T} key, ${shapeDeserializer:T} deserializer) {
-                                ${?sparse}if (deserializer.isNull()) {
+                                if (deserializer.isNull()) {
+                                    ${?sparse}
                                     state.put(key, deserializer.readNull());
                                     return;
-                                }${/sparse}
+                                    ${/sparse}
+                                    ${^sparse}
+                                    throw new ${serdeException:T}("Null not allowed in non-sparse map");
+                                    ${/sparse}
+                                }
                                 state.put(key, $memberDeserializer:C);
                             }
                         }
@@ -96,6 +104,7 @@ public class MapGenerator
                     writer.putContext("value", valueSymbol);
                     writer.putContext("valueSchema", valueSchema);
                     writer.putContext("key", keySymbol);
+                    writer.putContext("serdeException", SerializationException.class);
                     writer.putContext(
                         "collectionImpl",
                         directive.symbol().expectProperty(SymbolProperties.COLLECTION_IMPLEMENTATION_CLASS)

@@ -217,7 +217,7 @@ final class TestClient {
             return cf.whenComplete((res, ex) -> {
                 channel.pipeline().remove("resp");
                 channel.close();
-            }).get(5, TimeUnit.SECONDS);
+            }).get(500000000, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException(e);

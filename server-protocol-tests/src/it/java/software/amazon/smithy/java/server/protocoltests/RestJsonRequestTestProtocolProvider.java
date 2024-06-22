@@ -72,21 +72,24 @@ public final class RestJsonRequestTestProtocolProvider implements
 
         @Override
         public CompletableFuture<Void> serializeOutput(Job job) {
-            job.reply().setValue(new ByteValue("{}".getBytes(StandardCharsets.UTF_8)));
-            job.reply()
-                .context()
-                .put(
-                    HttpAttributes.HTTP_HEADERS,
-                    HttpHeaders.of(
-                        Map.of(
-                            "Content-Length",
-                            List.of("2")
-                        ),
-                        (v1, v2) -> true
-                    )
-                );
-            job.reply().context().put(HttpAttributes.STATUS_CODE, 200);
-            return CompletableFuture.completedFuture(null);
+            if (job.getFailure().isEmpty() && job.reply().getValue() == null) {
+                job.reply().setValue(new ByteValue("{}".getBytes(StandardCharsets.UTF_8)));
+                job.reply()
+                    .context()
+                    .put(
+                        HttpAttributes.HTTP_HEADERS,
+                        HttpHeaders.of(
+                            Map.of(
+                                "Content-Length",
+                                List.of("2")
+                            ),
+                            (v1, v2) -> true
+                        )
+                    );
+                job.reply().context().put(HttpAttributes.STATUS_CODE, 200);
+                return CompletableFuture.completedFuture(null);
+            }
+            return delegate.serializeOutput(job);
         }
     }
 }

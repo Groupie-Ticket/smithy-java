@@ -7,9 +7,11 @@ package software.amazon.smithy.java.runtime.core.serde;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.Locale;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
@@ -117,30 +119,38 @@ public interface TimestampFormatter {
                 if (strict) {
                     throw new TimestampSyntaxError(format(), ExpectedType.NUMBER, value);
                 }
-                return Instant.ofEpochMilli((long) (Double.parseDouble(value) * 1000));
+                try {
+                    return Instant.ofEpochMilli((long) (Double.parseDouble(value) * 1000));
+                } catch (NumberFormatException | DateTimeException e) {
+                    throw new TimestampParseError(TimestampFormatTrait.Format.EPOCH_SECONDS, e);
+                }
             }
 
             @Override
             public Instant readFromNumber(Number value) {
-                // The most common types for serialized epoch-seconds, double/integer/long, are checked first.
-                if (value instanceof Double f) {
-                    return Instant.ofEpochMilli((long) (f * 1000f));
-                } else if (value instanceof Integer i) {
-                    return Instant.ofEpochMilli(i * 1000L);
-                } else if (value instanceof Long l) {
-                    return Instant.ofEpochMilli(l * 1000L);
-                } else if (value instanceof Byte b) {
-                    return Instant.ofEpochMilli(b * 1000L);
-                } else if (value instanceof Short s) {
-                    return Instant.ofEpochMilli(s * 1000L);
-                } else if (value instanceof Float f) {
-                    return Instant.ofEpochMilli((long) (f * 1000f));
-                } else if (value instanceof BigInteger bi) {
-                    return Instant.ofEpochMilli(bi.longValue() * 1000);
-                } else if (value instanceof BigDecimal bd) {
-                    return Instant.ofEpochMilli(bd.longValue() * 1000);
-                } else {
-                    throw new TimestampSyntaxError(format(), ExpectedType.NUMBER, value);
+                try {
+                    // The most common types for serialized epoch-seconds, double/integer/long, are checked first.
+                    if (value instanceof Double f) {
+                        return Instant.ofEpochMilli((long) (f * 1000f));
+                    } else if (value instanceof Integer i) {
+                        return Instant.ofEpochMilli(i * 1000L);
+                    } else if (value instanceof Long l) {
+                        return Instant.ofEpochMilli(l * 1000L);
+                    } else if (value instanceof Byte b) {
+                        return Instant.ofEpochMilli(b * 1000L);
+                    } else if (value instanceof Short s) {
+                        return Instant.ofEpochMilli(s * 1000L);
+                    } else if (value instanceof Float f) {
+                        return Instant.ofEpochMilli((long) (f * 1000f));
+                    } else if (value instanceof BigInteger bi) {
+                        return Instant.ofEpochMilli(bi.longValue() * 1000);
+                    } else if (value instanceof BigDecimal bd) {
+                        return Instant.ofEpochMilli(bd.longValue() * 1000);
+                    } else {
+                        throw new TimestampSyntaxError(format(), ExpectedType.NUMBER, value);
+                    }
+                } catch (DateTimeException e) {
+                    throw new TimestampParseError(TimestampFormatTrait.Format.EPOCH_SECONDS, e);
                 }
             }
 
@@ -164,7 +174,11 @@ public interface TimestampFormatter {
 
             @Override
             public Instant readFromString(String value, boolean strict) {
-                return DateTimeFormatter.ISO_INSTANT.parse(value, Instant::from);
+                try {
+                    return DateTimeFormatter.ISO_INSTANT.parse(value, Instant::from);
+                } catch (DateTimeParseException e) {
+                    throw new TimestampParseError(TimestampFormatTrait.Format.DATE_TIME, e);
+                }
             }
         },
 
@@ -181,7 +195,11 @@ public interface TimestampFormatter {
 
             @Override
             public Instant readFromString(String value, boolean strict) {
-                return HTTP_DATE_FORMAT.parse(value, Instant::from);
+                try {
+                    return HTTP_DATE_FORMAT.parse(value, Instant::from);
+                } catch (DateTimeParseException e) {
+                    throw new TimestampParseError(TimestampFormatTrait.Format.HTTP_DATE, e);
+                }
             }
         };
 
@@ -261,6 +279,15 @@ public interface TimestampFormatter {
          */
         public Object value() {
             return value;
+        }
+    }
+
+    /**
+     * Thrown when a timestamp input is the proper type but unparseable.
+     */
+    final class TimestampParseError extends SerializationException {
+        public TimestampParseError(TimestampFormatTrait.Format format, Throwable t) {
+            super("Could not parse timestamp in format " + format.name(), t);
         }
     }
 }

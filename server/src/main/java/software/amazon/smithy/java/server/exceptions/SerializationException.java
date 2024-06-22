@@ -15,9 +15,9 @@ import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.ErrorTrait;
 import software.amazon.smithy.model.traits.HttpErrorTrait;
 
-public class UnknownOperationException extends ModeledApiException {
+public class SerializationException extends ModeledApiException {
 
-    private static final ShapeId ID = ShapeId.from("smithy.exceptions#UnknownOperationException");
+    private static final ShapeId ID = ShapeId.from("smithy.exceptions#SerializationException");
 
     private static final Schema SCHEMA_MESSAGE = Schema.memberBuilder("message", PreludeSchemas.STRING)
         .id(ID)
@@ -30,7 +30,7 @@ public class UnknownOperationException extends ModeledApiException {
             new ErrorTrait("client"),
             new HttpErrorTrait.Provider().createTrait(
                 ShapeId.from("smithy.api#httpError"),
-                Node.from(404)
+                Node.from(400)
             )
         )
         .members(
@@ -38,8 +38,8 @@ public class UnknownOperationException extends ModeledApiException {
         )
         .build();
 
-    public UnknownOperationException(String message) {
-        super(ID, message);
+    public SerializationException(Throwable cause) {
+        super(ID, "SerializationException", cause);
     }
 
     @Override
