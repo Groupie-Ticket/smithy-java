@@ -7,6 +7,7 @@ package software.amazon.smithy.java.server.netty;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import io.netty.buffer.UnpooledHeapByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -290,13 +291,10 @@ final class NettyHandler extends ChannelDuplexHandler {
 
     private static void sendErrorResponse(Throwable throwable, Channel channel) {
         LOGGER.log(Level.ERROR, "Unhandled error, closing connection", throwable);
-        ByteBuf content = Unpooled.wrappedBuffer(throwable.getClass().getSimpleName().getBytes(StandardCharsets.UTF_8));
         HttpResponse response = new DefaultFullHttpResponse(
             HttpVersion.HTTP_1_1,
-            HttpResponseStatus.INTERNAL_SERVER_ERROR,
-            content
+            HttpResponseStatus.INTERNAL_SERVER_ERROR
         );
-        response.headers().add(HttpHeaderNames.CONTENT_LENGTH, content.readableBytes());
         channel.writeAndFlush(response);
 
         //TODO: figure out when it is safe to not close here
