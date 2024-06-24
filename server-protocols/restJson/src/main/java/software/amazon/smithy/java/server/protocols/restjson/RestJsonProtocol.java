@@ -14,13 +14,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import software.amazon.smithy.java.runtime.core.Context;
-import software.amazon.smithy.java.runtime.core.schema.ApiOperation;
-import software.amazon.smithy.java.runtime.core.schema.InputEventStreamingSdkOperation;
-import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
-import software.amazon.smithy.java.runtime.core.schema.OutputEventStreamingSdkOperation;
-import software.amazon.smithy.java.runtime.core.schema.Schema;
-import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
-import software.amazon.smithy.java.runtime.core.schema.ShapeBuilder;
+import software.amazon.smithy.java.runtime.core.schema.*;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.DataStream;
 import software.amazon.smithy.java.runtime.core.serde.EventStreamFrameEncodingProcessor;
@@ -165,12 +159,12 @@ public final class RestJsonProtocol extends ServerProtocol {
 
     private static RuntimeException handleException(Throwable t) {
         if (t instanceof SerializationException se) {
-            throw new software.amazon.smithy.java.server.exceptions.SerializationException(se);
+            return new software.amazon.smithy.java.server.exceptions.SerializationException(se);
         }
         if (t instanceof ModeledApiException mse) {
-            throw mse;
+            return mse;
         }
-        throw new InternalServerException(t);
+        return new InternalServerException(t);
     }
 
     private DataStream getDataStream(Value value, HttpHeaders headers) {
@@ -246,7 +240,8 @@ public final class RestJsonProtocol extends ServerProtocol {
                 serializer.getEventStream(),
                 new AwsFlowShapeEncoder<>(
                     outputStreamingOp.outputEventSchema(),
-                    codec
+                    codec,
+                    RestJsonProtocol::handlEventStreamingException
                 ),
                 new AwsFlowFrameEncoder()
             );
@@ -263,6 +258,17 @@ public final class RestJsonProtocol extends ServerProtocol {
             }
         }
         return CompletableFuture.completedFuture(null);
+    }
+
+    private static EventStreamingException handlEventStreamingException(Throwable e) {
+        if (e instanceof SerializationException se) {
+            return new EventStreamingException("SerializationException", se.getMessage());
+        } else if (e instanceof ModeledApiException mae) {
+            return SyntheticExceptions.getSchema(mae.getShapeId())
+                .map(s -> new EventStreamingException(s.id().getName(), mae.getMessage()))
+                .orElseGet(() -> new EventStreamingException("InternalServerError", "internal server error"));
+        }
+        return new EventStreamingException("InternalServerError", "internal server error");
     }
 
     private static Schema getExceptionSchema(ApiOperation<?, ?> apiOperation, Exception e) {
