@@ -8,9 +8,10 @@ package software.amazon.smithy.java.runtime.core.serde;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.time.Instant;
+import org.junit.jupiter.api.Test;
 
 public class TimestampFormatterTest {
-    //@Test
+    @Test
     public void testEpochSecondsRounding() {
         Instant wholeTime = Instant.ofEpochSecond(7234);
         assertEquals("7234", TimestampFormatter.Prelude.EPOCH_SECONDS.writeString(wholeTime));
