@@ -5,18 +5,20 @@
 
 package com.amazonaws.autoloop.mockserver;
 
-import com.amazon.hyperloop.streaming.model.CloudEvent;
-import com.amazon.hyperloop.streaming.model.CreateAttributeSyncStreamInput;
-import com.amazon.hyperloop.streaming.model.CreateAttributeSyncStreamOutput;
-import com.amazon.hyperloop.streaming.model.EdgeEvent;
-import com.amazon.hyperloop.streaming.model.InternalServerException;
+import static org.reactivestreams.FlowAdapters.toFlowPublisher;
+import static org.reactivestreams.FlowAdapters.toPublisher;
+
+import com.amazon.hyperloop.streaming.model.*;
 import com.amazon.hyperloop.streaming.service.Autoloop;
 import com.amazon.hyperloop.streaming.service.CreateAttributeSyncStreamOperation;
 import com.amazonaws.autoloop.mockserver.processing.CreateAttributeSyncStreamValidator;
 import com.amazonaws.autoloop.mockserver.processing.EdgeEventProcessor;
+import io.reactivex.rxjava3.core.Flowable;
+import io.reactivex.rxjava3.core.Notification;
+import io.reactivex.rxjava3.schedulers.Schedulers;
 import java.net.URI;
+import java.util.List;
 import java.util.concurrent.Flow;
-import java.util.concurrent.SubmissionPublisher;
 import java.util.concurrent.atomic.AtomicReference;
 import software.amazon.smithy.java.server.RequestContext;
 import software.amazon.smithy.java.server.Server;
@@ -75,16 +77,19 @@ public class AutoloopServer {
             createAttributeSyncStreamValidator.validate(input);
 
             // setup eventhandling chain
-            CreateAttributeSyncStreamProcessor processor = new CreateAttributeSyncStreamProcessor(
-                edgeEventProcessor,
-                input
-            );
-            input.event().subscribe(processor);
-            return CreateAttributeSyncStreamOutput.builder().event(processor).build();
+            return CreateAttributeSyncStreamOutput.builder().event(getStream(input)).build();
         }
 
-        private static final class CreateAttributeSyncStreamProcessor extends SubmissionPublisher<CloudEvent> implements
-            Flow.Subscriber<EdgeEvent> {
+        private Flow.Publisher<CloudEvent> getStream(CreateAttributeSyncStreamInput input) {
+            return toFlowPublisher(
+                Flowable.fromPublisher(toPublisher(input.event()))
+                    .observeOn(Schedulers.computation())
+                    .materialize()
+                    .concatMap(new CreateAttributeSyncStreamProcessor(edgeEventProcessor, input)::getFlowable)
+            );
+        }
+
+        private static final class CreateAttributeSyncStreamProcessor {
             private final AtomicReference<Flow.Subscription> upstream = new AtomicReference<>();
             private final EdgeEventProcessor edgeEventProcessor;
             private final CreateAttributeSyncStreamInput createAttributeSyncStreamInput;
@@ -97,36 +102,21 @@ public class AutoloopServer {
                 this.createAttributeSyncStreamInput = createAttributeSyncStreamInput;
             }
 
-            @Override
-            public void onSubscribe(Flow.Subscription subscription) {
-                if (!upstream.compareAndSet(null, subscription)) {
-                    throw new IllegalStateException();
+            public Flowable<CloudEvent> getFlowable(Notification<EdgeEvent> event) {
+                if (event.isOnComplete()) {
+                    return Flowable.empty();
+                } else if (event.isOnError()) {
+                    return Flowable.error(event.getError());
                 }
-                subscription.request(1);
-            }
-
-            @Override
-            public void onNext(EdgeEvent item) {
-                CloudEvent result = null;
                 try {
-                    result = edgeEventProcessor.process(item, createAttributeSyncStreamInput);
-                    submit(result);
-                } catch (UnsupportedOperationException | IllegalStateException ex) {
-                    throw InternalServerException.builder().message(ex.getMessage()).build();
+                    return Flowable.fromIterable(
+                        List.of(edgeEventProcessor.process(event.getValue(), createAttributeSyncStreamInput))
+                    );
+                } catch (UnsupportedOperationException | IllegalStateException e) {
+                    return Flowable.error(InternalServerException.builder().message(e.getMessage()).build());
                 }
-
-                upstream.get().request(1);
             }
 
-            @Override
-            public void onError(Throwable throwable) {
-                closeExceptionally(throwable);
-            }
-
-            @Override
-            public void onComplete() {
-                super.close();
-            }
         }
     }
 }
