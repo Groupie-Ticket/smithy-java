@@ -6,6 +6,7 @@
 package software.amazon.smithy.java.runtime.json;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.comparesEqualTo;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
@@ -21,8 +22,8 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -44,9 +45,10 @@ public class JsonDocumentTest {
 
     private static final String FOO_B64 = "Zm9v";
 
-    @Test
-    public void convertsNumberToNumber() {
-        var codec = JsonCodec.builder().build();
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void convertsNumberToNumber(JsonCodec.Builder builder) {
+        var codec = builder.build();
         var de = codec.createDeserializer("120".getBytes(StandardCharsets.UTF_8));
 
         var document = de.readDocument();
@@ -58,12 +60,13 @@ public class JsonDocumentTest {
         assertThat(document.asFloat(), is(120f));
         assertThat(document.asDouble(), is(120.0));
         assertThat(document.asBigInteger(), equalTo(BigInteger.valueOf(120)));
-        assertThat(document.asBigDecimal(), equalTo(BigDecimal.valueOf(120.0)));
+        assertThat(document.asBigDecimal(), comparesEqualTo(BigDecimal.valueOf(120.0)));
     }
 
-    @Test
-    public void convertsDoubleToNumber() {
-        var codec = JsonCodec.builder().build();
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void convertsDoubleToNumber(JsonCodec.Builder builder) {
+        var codec = builder.build();
         var de = codec.createDeserializer("1.1".getBytes(StandardCharsets.UTF_8));
 
         var document = de.readDocument();
@@ -72,9 +75,10 @@ public class JsonDocumentTest {
         assertThat(document.asDouble(), is(1.1));
     }
 
-    @Test
-    public void convertsToBoolean() {
-        var codec = JsonCodec.builder().build();
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void convertsToBoolean(JsonCodec.Builder builder) {
+        var codec = builder.build();
         var de = codec.createDeserializer("true".getBytes(StandardCharsets.UTF_8));
 
         var document = de.readDocument();
@@ -82,9 +86,10 @@ public class JsonDocumentTest {
         assertThat(document.asBoolean(), is(true));
     }
 
-    @Test
-    public void convertsToTimestampWithEpochSeconds() {
-        var codec = JsonCodec.builder().build();
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void convertsToTimestampWithEpochSeconds(JsonCodec.Builder builder) {
+        var codec = builder.build();
         var de = codec.createDeserializer("0".getBytes(StandardCharsets.UTF_8));
 
         var document = de.readDocument();
@@ -92,10 +97,11 @@ public class JsonDocumentTest {
         assertThat(document.asTimestamp(), equalTo(Instant.EPOCH));
     }
 
-    @Test
-    public void convertsToTimestampWithDefaultStringFormat() {
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void convertsToTimestampWithDefaultStringFormat(JsonCodec.Builder builder) {
         var now = Instant.now();
-        var codec = JsonCodec.builder().defaultTimestampFormat(TimestampFormatter.Prelude.DATE_TIME).build();
+        var codec = builder.defaultTimestampFormat(TimestampFormatter.Prelude.DATE_TIME).build();
         var de = codec.createDeserializer(("\"" + now + "\"").getBytes(StandardCharsets.UTF_8));
 
         var document = de.readDocument();
@@ -103,9 +109,10 @@ public class JsonDocumentTest {
         assertThat(document.asTimestamp(), equalTo(now));
     }
 
-    @Test
-    public void convertsToTimestampFailsOnUnknownType() {
-        var codec = JsonCodec.builder().build();
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void convertsToTimestampFailsOnUnknownType(JsonCodec.Builder builder) {
+        var codec = builder.build();
         var de = codec.createDeserializer("true".getBytes(StandardCharsets.UTF_8));
         var document = de.readDocument();
 
@@ -113,9 +120,10 @@ public class JsonDocumentTest {
         assertThat(e.getMessage(), containsString("Expected a timestamp, but found boolean"));
     }
 
-    @Test
-    public void convertsToBlob() {
-        var codec = JsonCodec.builder().build();
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void convertsToBlob(JsonCodec.Builder builder) {
+        var codec = builder.build();
         var de = codec.createDeserializer(("\"" + FOO_B64 + "\"").getBytes(StandardCharsets.UTF_8));
         var document = de.readDocument();
 
@@ -125,9 +133,10 @@ public class JsonDocumentTest {
         assertThat(document.asBlob(), equalTo("foo".getBytes(StandardCharsets.UTF_8)));
     }
 
-    @Test
-    public void convertsToList() {
-        var codec = JsonCodec.builder().build();
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void convertsToList(JsonCodec.Builder builder) {
+        var codec = builder.build();
         var de = codec.createDeserializer("[1, 2, 3]".getBytes(StandardCharsets.UTF_8));
 
         var document = de.readDocument();
@@ -141,9 +150,10 @@ public class JsonDocumentTest {
         assertThat(list.get(2).asInteger(), is(3));
     }
 
-    @Test
-    public void convertsToMap() {
-        var codec = JsonCodec.builder().build();
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void convertsToMap(JsonCodec.Builder builder) {
+        var codec = builder.build();
         var de = codec.createDeserializer("{\"a\":1,\"b\":true}".getBytes(StandardCharsets.UTF_8));
 
         var document = de.readDocument();
@@ -160,9 +170,10 @@ public class JsonDocumentTest {
         assertThat(document.getMember("b").type(), is(ShapeType.BOOLEAN));
     }
 
-    @Test
-    public void nullAndMissingMapMembersReturnsNull() {
-        var codec = JsonCodec.builder().build();
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void nullAndMissingMapMembersReturnsNull(JsonCodec.Builder builder) {
+        var codec = builder.build();
         var de = codec.createDeserializer("{\"a\":null}".getBytes(StandardCharsets.UTF_8));
 
         var document = de.readDocument();
@@ -172,8 +183,8 @@ public class JsonDocumentTest {
 
     @ParameterizedTest
     @MethodSource("failToConvertSource")
-    public void failToConvert(String json, Consumer<Document> consumer) {
-        var codec = JsonCodec.builder().build();
+    public void failToConvert(String json, Consumer<Document> consumer, JsonCodec.Builder builder) {
+        var codec = builder.build();
         var de = codec.createDeserializer(json.getBytes(StandardCharsets.UTF_8));
         var document = de.readDocument();
 
@@ -181,34 +192,38 @@ public class JsonDocumentTest {
     }
 
     public static List<Arguments> failToConvertSource() {
-        return List.of(
-            Arguments.of("1", (Consumer<Document>) Document::asBoolean),
-            Arguments.of("1", (Consumer<Document>) Document::asBlob),
-            Arguments.of("1", (Consumer<Document>) Document::asString),
-            Arguments.of("1", (Consumer<Document>) Document::asList),
-            Arguments.of("1", (Consumer<Document>) Document::asStringMap),
-            Arguments.of("1", (Consumer<Document>) Document::asBlob),
+        return JsonTestData.builders()
+            .flatMap(
+                a -> Stream.of(
+                    Arguments.of("1", (Consumer<Document>) Document::asBoolean, a.get()[0]),
+                    Arguments.of("1", (Consumer<Document>) Document::asBlob, a.get()[0]),
+                    Arguments.of("1", (Consumer<Document>) Document::asString, a.get()[0]),
+                    Arguments.of("1", (Consumer<Document>) Document::asList, a.get()[0]),
+                    Arguments.of("1", (Consumer<Document>) Document::asStringMap, a.get()[0]),
+                    Arguments.of("1", (Consumer<Document>) Document::asBlob, a.get()[0]),
 
-            Arguments.of("\"1\"", (Consumer<Document>) Document::asBoolean),
-            Arguments.of("\"1\"", (Consumer<Document>) Document::asList),
-            Arguments.of("\"1\"", (Consumer<Document>) Document::asStringMap),
-            Arguments.of("\"1\"", (Consumer<Document>) Document::asBlob),
-            Arguments.of("\"1\"", (Consumer<Document>) Document::asBoolean),
-            Arguments.of("\"1\"", (Consumer<Document>) Document::asByte),
-            Arguments.of("\"1\"", (Consumer<Document>) Document::asShort),
-            Arguments.of("\"1\"", (Consumer<Document>) Document::asInteger),
-            Arguments.of("\"1\"", (Consumer<Document>) Document::asLong),
-            Arguments.of("\"1\"", (Consumer<Document>) Document::asFloat),
-            Arguments.of("\"1\"", (Consumer<Document>) Document::asDouble),
-            Arguments.of("\"1\"", (Consumer<Document>) Document::asBigInteger),
-            Arguments.of("\"1\"", (Consumer<Document>) Document::asBigDecimal)
-        );
+                    Arguments.of("\"1\"", (Consumer<Document>) Document::asBoolean, a.get()[0]),
+                    Arguments.of("\"1\"", (Consumer<Document>) Document::asList, a.get()[0]),
+                    Arguments.of("\"1\"", (Consumer<Document>) Document::asStringMap, a.get()[0]),
+                    Arguments.of("\"1\"", (Consumer<Document>) Document::asBlob, a.get()[0]),
+                    Arguments.of("\"1\"", (Consumer<Document>) Document::asBoolean, a.get()[0]),
+                    Arguments.of("\"1\"", (Consumer<Document>) Document::asByte, a.get()[0]),
+                    Arguments.of("\"1\"", (Consumer<Document>) Document::asShort, a.get()[0]),
+                    Arguments.of("\"1\"", (Consumer<Document>) Document::asInteger, a.get()[0]),
+                    Arguments.of("\"1\"", (Consumer<Document>) Document::asLong, a.get()[0]),
+                    Arguments.of("\"1\"", (Consumer<Document>) Document::asFloat, a.get()[0]),
+                    Arguments.of("\"1\"", (Consumer<Document>) Document::asDouble, a.get()[0]),
+                    Arguments.of("\"1\"", (Consumer<Document>) Document::asBigInteger, a.get()[0]),
+                    Arguments.of("\"1\"", (Consumer<Document>) Document::asBigDecimal, a.get()[0])
+                )
+            )
+            .toList();
     }
 
     @ParameterizedTest
     @MethodSource("serializeContentSource")
-    public void serializeContent(String json) {
-        var codec = JsonCodec.builder().build();
+    public void serializeContent(String json, JsonCodec.Builder builder) {
+        var codec = builder.build();
         var sink = new ByteArrayOutputStream();
         var se = codec.createSerializer(sink);
         var de = codec.createDeserializer(json.getBytes(StandardCharsets.UTF_8));
@@ -221,8 +236,8 @@ public class JsonDocumentTest {
 
     @ParameterizedTest
     @MethodSource("serializeContentSource")
-    public void serializeDocument(String json) {
-        var codec = JsonCodec.builder().build();
+    public void serializeDocument(String json, JsonCodec.Builder builder) {
+        var codec = builder.build();
         var sink = new ByteArrayOutputStream();
         var se = codec.createSerializer(sink);
         var de = codec.createDeserializer(json.getBytes(StandardCharsets.UTF_8));
@@ -234,21 +249,26 @@ public class JsonDocumentTest {
     }
 
     public static List<Arguments> serializeContentSource() {
-        return List.of(
-            Arguments.of("true"),
-            Arguments.of("false"),
-            Arguments.of("1"),
-            Arguments.of("1.1"),
-            Arguments.of("[1,2,3]"),
-            Arguments.of("{\"a\":1,\"b\":[1,true,-20,\"hello\"]}")
-        );
+        return JsonTestData.builders()
+            .flatMap(
+                a -> Stream.of(
+                    Arguments.of("true", a.get()[0]),
+                    Arguments.of("false", a.get()[0]),
+                    Arguments.of("1", a.get()[0]),
+                    Arguments.of("1.1", a.get()[0]),
+                    Arguments.of("[1,2,3]", a.get()[0]),
+                    Arguments.of("{\"a\":1,\"b\":[1,true,-20,\"hello\"]}", a.get()[0])
+                )
+            )
+            .toList();
     }
 
-    @Test
-    public void deserializesIntoBuilderWithJsonNameAndTimestampFormat() {
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void deserializesIntoBuilderWithJsonNameAndTimestampFormat(JsonCodec.Builder codecBuilder) {
         String date = Instant.EPOCH.toString();
         var json = "{\"name\":\"Hank\",\"BINARY\":\"" + FOO_B64 + "\",\"date\":\"" + date + "\",\"numbers\":[1,2,3]}";
-        var codec = JsonCodec.builder().useTimestampFormat(true).useJsonName(true).build();
+        var codec = codecBuilder.useTimestampFormat(true).useJsonName(true).build();
         var de = codec.createDeserializer(json.getBytes(StandardCharsets.UTF_8));
         var document = de.readDocument();
 
@@ -262,10 +282,11 @@ public class JsonDocumentTest {
         assertThat(pojo.numbers, equalTo(List.of(1, 2, 3)));
     }
 
-    @Test
-    public void deserializesIntoBuilder() {
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void deserializesIntoBuilder(JsonCodec.Builder codecBuilder) {
         var json = "{\"name\":\"Hank\",\"binary\":\"" + FOO_B64 + "\",\"date\":0,\"numbers\":[1,2,3]}";
-        var codec = JsonCodec.builder().build();
+        var codec = codecBuilder.build();
         var de = codec.createDeserializer(json.getBytes(StandardCharsets.UTF_8));
         var document = de.readDocument();
 
@@ -364,8 +385,8 @@ public class JsonDocumentTest {
 
     @ParameterizedTest
     @MethodSource("checkEqualitySource")
-    public void checkEquality(String left, String right, boolean equal) {
-        var codec = JsonCodec.builder().build();
+    public void checkEquality(String left, String right, boolean equal, JsonCodec.Builder builder) {
+        var codec = builder.build();
 
         var de1 = codec.createDeserializer(left.getBytes(StandardCharsets.UTF_8));
         var leftValue = de1.readDocument();
@@ -377,27 +398,32 @@ public class JsonDocumentTest {
     }
 
     public static List<Arguments> checkEqualitySource() {
-        return List.of(
-            Arguments.of("1", "1", true),
-            Arguments.of("1", "1.1", false),
-            Arguments.of("true", "true", true),
-            Arguments.of("true", "false", false),
-            Arguments.of("1", "false", false),
-            Arguments.of("1", "\"1\"", false),
-            Arguments.of("\"foo\"", "\"foo\"", true),
-            Arguments.of("[\"foo\"]", "[\"foo\"]", true),
-            Arguments.of("{\"foo\":\"foo\"}", "{\"foo\":\"foo\"}", true),
-            Arguments.of("{\"foo\":\"foo\"}", "{\"foo\":\"bar\"}", false)
-        );
+        return JsonTestData.builders()
+            .flatMap(
+                a -> Stream.of(
+                    Arguments.of("1", "1", true, a.get()[0]),
+                    Arguments.of("1", "1.1", false, a.get()[0]),
+                    Arguments.of("true", "true", true, a.get()[0]),
+                    Arguments.of("true", "false", false, a.get()[0]),
+                    Arguments.of("1", "false", false, a.get()[0]),
+                    Arguments.of("1", "\"1\"", false, a.get()[0]),
+                    Arguments.of("\"foo\"", "\"foo\"", true, a.get()[0]),
+                    Arguments.of("[\"foo\"]", "[\"foo\"]", true, a.get()[0]),
+                    Arguments.of("{\"foo\":\"foo\"}", "{\"foo\":\"foo\"}", true, a.get()[0]),
+                    Arguments.of("{\"foo\":\"foo\"}", "{\"foo\":\"bar\"}", false, a.get()[0])
+                )
+            )
+            .toList();
     }
 
-    @Test
-    public void onlyEqualIfBothUseTimestampFormat() {
-        var de1 = JsonCodec.builder()
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void onlyEqualIfBothUseTimestampFormat(JsonCodec.Builder builder) {
+        var de1 = builder
             .useTimestampFormat(true)
             .build()
             .createDeserializer("1".getBytes(StandardCharsets.UTF_8));
-        var de2 = JsonCodec.builder()
+        var de2 = builder
             .useTimestampFormat(false)
             .build()
             .createDeserializer("1".getBytes(StandardCharsets.UTF_8));
@@ -408,13 +434,14 @@ public class JsonDocumentTest {
         assertThat(leftValue, not(equalTo(rightValue)));
     }
 
-    @Test
-    public void onlyEqualIfBothUseJsonName() {
-        var de1 = JsonCodec.builder()
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void onlyEqualIfBothUseJsonName(JsonCodec.Builder builder) {
+        var de1 = builder
             .useJsonName(true)
             .build()
             .createDeserializer("1".getBytes(StandardCharsets.UTF_8));
-        var de2 = JsonCodec.builder()
+        var de2 = builder
             .useJsonName(false)
             .build()
             .createDeserializer("1".getBytes(StandardCharsets.UTF_8));
@@ -425,9 +452,10 @@ public class JsonDocumentTest {
         assertThat(leftValue, not(equalTo(rightValue)));
     }
 
-    @Test
-    public void canNormalizeJsonDocuments() {
-        var codec = JsonCodec.builder().build();
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void canNormalizeJsonDocuments(JsonCodec.Builder builder) {
+        var codec = builder.build();
         var de = codec.createDeserializer("true".getBytes(StandardCharsets.UTF_8));
         var json = de.readDocument();
 

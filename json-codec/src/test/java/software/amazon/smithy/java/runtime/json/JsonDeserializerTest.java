@@ -25,8 +25,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -38,41 +38,46 @@ import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.TimestampFormatTrait;
 
 public class JsonDeserializerTest {
-    @Test
-    public void deserializesByte() {
-        try (var codec = JsonCodec.builder().build()) {
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void deserializesByte(JsonCodec.Builder builder) {
+        try (var codec = builder.build()) {
             var de = codec.createDeserializer("1".getBytes(StandardCharsets.UTF_8));
             assertThat(de.readByte(PreludeSchemas.BYTE), is((byte) 1));
         }
     }
 
-    @Test
-    public void deserializesShort() {
-        try (var codec = JsonCodec.builder().build()) {
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void deserializesShort(JsonCodec.Builder builder) {
+        try (var codec = builder.build()) {
             var de = codec.createDeserializer("1".getBytes(StandardCharsets.UTF_8));
             assertThat(de.readShort(PreludeSchemas.SHORT), is((short) 1));
         }
     }
 
-    @Test
-    public void deserializesInteger() {
-        try (var codec = JsonCodec.builder().build()) {
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void deserializesInteger(JsonCodec.Builder builder) {
+        try (var codec = builder.build()) {
             var de = codec.createDeserializer("1".getBytes(StandardCharsets.UTF_8));
             assertThat(de.readInteger(PreludeSchemas.INTEGER), is(1));
         }
     }
 
-    @Test
-    public void deserializesLong() {
-        try (var codec = JsonCodec.builder().build()) {
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void deserializesLong(JsonCodec.Builder builder) {
+        try (var codec = builder.build()) {
             var de = codec.createDeserializer("1".getBytes(StandardCharsets.UTF_8));
             assertThat(de.readLong(PreludeSchemas.LONG), is(1L));
         }
     }
 
-    @Test
-    public void deserializesFloat() {
-        try (var codec = JsonCodec.builder().build()) {
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void deserializesFloat(JsonCodec.Builder builder) {
+        try (var codec = builder.build()) {
             var de = codec.createDeserializer("1".getBytes(StandardCharsets.UTF_8));
             assertThat(de.readFloat(PreludeSchemas.FLOAT), is(1.0f));
             de = codec.createDeserializer("\"NaN\"".getBytes(StandardCharsets.UTF_8));
@@ -84,9 +89,10 @@ public class JsonDeserializerTest {
         }
     }
 
-    @Test
-    public void deserializesDouble() {
-        try (var codec = JsonCodec.builder().build()) {
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void deserializesDouble(JsonCodec.Builder builder) {
+        try (var codec = builder.build()) {
             var de = codec.createDeserializer("1".getBytes(StandardCharsets.UTF_8));
             assertThat(de.readDouble(PreludeSchemas.DOUBLE), is(1.0));
             de = codec.createDeserializer("\"NaN\"".getBytes(StandardCharsets.UTF_8));
@@ -98,41 +104,46 @@ public class JsonDeserializerTest {
         }
     }
 
-    @Test
-    public void deserializesBigInteger() {
-        try (var codec = JsonCodec.builder().build()) {
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void deserializesBigInteger(JsonCodec.Builder builder) {
+        try (var codec = builder.build()) {
             var de = codec.createDeserializer("1".getBytes(StandardCharsets.UTF_8));
             assertThat(de.readBigInteger(PreludeSchemas.BIG_INTEGER), is(BigInteger.ONE));
         }
     }
 
-    @Test
-    public void deserializesBigIntegerOnlyFromRawNumbersByDefault() {
-        try (var codec = JsonCodec.builder().build()) {
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void deserializesBigIntegerOnlyFromRawNumbersByDefault(JsonCodec.Builder builder) {
+        try (var codec = builder.build()) {
             var de = codec.createDeserializer("\"1\"".getBytes(StandardCharsets.UTF_8));
             Assertions.assertThrows(SerializationException.class, () -> de.readBigInteger(PreludeSchemas.BIG_INTEGER));
         }
     }
 
-    @Test
-    public void deserializesBigDecimal() {
-        try (var codec = JsonCodec.builder().build()) {
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void deserializesBigDecimal(JsonCodec.Builder builder) {
+        try (var codec = builder.build()) {
             var de = codec.createDeserializer("1".getBytes(StandardCharsets.UTF_8));
             assertThat(de.readBigDecimal(PreludeSchemas.BIG_DECIMAL), is(BigDecimal.ONE));
         }
     }
 
-    @Test
-    public void deserializesBigDecimalOnlyFromRawNumbersByDefault() {
-        try (var codec = JsonCodec.builder().build()) {
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void deserializesBigDecimalOnlyFromRawNumbersByDefault(JsonCodec.Builder builder) {
+        try (var codec = builder.build()) {
             var de = codec.createDeserializer("\"1\"".getBytes(StandardCharsets.UTF_8));
             Assertions.assertThrows(SerializationException.class, () -> de.readBigDecimal(PreludeSchemas.BIG_DECIMAL));
         }
     }
 
-    @Test
-    public void deserializesTimestamp() {
-        try (var codec = JsonCodec.builder().build()) {
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void deserializesTimestamp(JsonCodec.Builder builder) {
+        try (var codec = builder.build()) {
             var sink = new ByteArrayOutputStream();
             try (var ser = codec.createSerializer(sink)) {
                 ser.writeTimestamp(PreludeSchemas.TIMESTAMP, Instant.EPOCH);
@@ -143,9 +154,10 @@ public class JsonDeserializerTest {
         }
     }
 
-    @Test
-    public void deserializesBlob() {
-        try (var codec = JsonCodec.builder().build()) {
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void deserializesBlob(JsonCodec.Builder builder) {
+        try (var codec = builder.build()) {
             var str = "foo";
             var expected = Base64.getEncoder().encodeToString(str.getBytes());
             var de = codec.createDeserializer(("\"" + expected + "\"").getBytes(StandardCharsets.UTF_8));
@@ -153,25 +165,28 @@ public class JsonDeserializerTest {
         }
     }
 
-    @Test
-    public void deserializesBoolean() {
-        try (var codec = JsonCodec.builder().build()) {
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void deserializesBoolean(JsonCodec.Builder builder) {
+        try (var codec = builder.build()) {
             var de = codec.createDeserializer("true".getBytes(StandardCharsets.UTF_8));
             assertThat(de.readBoolean(PreludeSchemas.BOOLEAN), is(true));
         }
     }
 
-    @Test
-    public void deserializesString() {
-        try (var codec = JsonCodec.builder().build()) {
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void deserializesString(JsonCodec.Builder builder) {
+        try (var codec = builder.build()) {
             var de = codec.createDeserializer("\"foo\"".getBytes(StandardCharsets.UTF_8));
             assertThat(de.readString(PreludeSchemas.STRING), equalTo("foo"));
         }
     }
 
-    @Test
-    public void deserializesList() {
-        try (var codec = JsonCodec.builder().build()) {
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void deserializesList(JsonCodec.Builder builder) {
+        try (var codec = builder.build()) {
             var de = codec.createDeserializer("[\"foo\",\"bar\"]".getBytes(StandardCharsets.UTF_8));
             List<String> values = new ArrayList<>();
 
@@ -183,9 +198,10 @@ public class JsonDeserializerTest {
         }
     }
 
-    @Test
-    public void deserializesMap() {
-        try (var codec = JsonCodec.builder().build()) {
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void deserializesMap(JsonCodec.Builder builder) {
+        try (var codec = builder.build()) {
             var de = codec.createDeserializer("{\"foo\":\"bar\",\"baz\":\"bam\"}".getBytes(StandardCharsets.UTF_8));
             Map<String, String> result = new LinkedHashMap<>();
 
@@ -201,9 +217,10 @@ public class JsonDeserializerTest {
         }
     }
 
-    @Test
-    public void deserializesStruct() {
-        try (var codec = JsonCodec.builder().useJsonName(true).build()) {
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void deserializesStruct(JsonCodec.Builder builder) {
+        try (var codec = builder.useJsonName(true).build()) {
             var de = codec.createDeserializer("{\"name\":\"Sam\",\"Color\":\"red\"}".getBytes(StandardCharsets.UTF_8));
             Set<String> members = new LinkedHashSet<>();
 
@@ -220,9 +237,10 @@ public class JsonDeserializerTest {
         }
     }
 
-    @Test
-    public void skipsUnknownMembers() {
-        try (var codec = JsonCodec.builder().useJsonName(true).build()) {
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void skipsUnknownMembers(JsonCodec.Builder builder) {
+        try (var codec = builder.useJsonName(true).build()) {
             var de = codec.createDeserializer(
                 "{\"name\":\"Sam\",\"Ignore\":[1,2,3],\"Color\":\"rainbow\"}".getBytes(StandardCharsets.UTF_8)
             );
@@ -243,8 +261,8 @@ public class JsonDeserializerTest {
 
     @ParameterizedTest
     @MethodSource("deserializesBirdWithJsonNameOrNotSource")
-    public void deserializesBirdWithJsonNameOrNot(boolean useJsonName, String input) {
-        try (var codec = JsonCodec.builder().useJsonName(useJsonName).build()) {
+    public void deserializesBirdWithJsonNameOrNot(boolean useJsonName, String input, JsonCodec.Builder builder) {
+        try (var codec = builder.useJsonName(useJsonName).build()) {
             var de = codec.createDeserializer(input.getBytes(StandardCharsets.UTF_8));
             Set<String> members = new LinkedHashSet<>();
             de.readStruct(JsonTestData.BIRD, members, (memberResult, member, deser) -> {
@@ -260,17 +278,22 @@ public class JsonDeserializerTest {
     }
 
     public static List<Arguments> deserializesBirdWithJsonNameOrNotSource() {
-        return List.of(
-            Arguments.of(true, "{\"name\":\"Sam\",\"Color\":\"red\"}"),
-            Arguments.of(false, "{\"name\":\"Sam\",\"color\":\"red\"}")
-        );
+        return JsonTestData.builders()
+            .flatMap(
+                a -> Stream.of(
+                    Arguments.of(true, "{\"name\":\"Sam\",\"Color\":\"red\"}", a.get()[0]),
+                    Arguments.of(false, "{\"name\":\"Sam\",\"color\":\"red\"}", a.get()[0])
+                )
+            )
+            .toList();
     }
 
-    @Test
-    public void readsDocuments() {
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void readsDocuments(JsonCodec.Builder builder) {
         var json = "{\"name\":\"Sam\",\"color\":\"red\"}".getBytes(StandardCharsets.UTF_8);
 
-        try (var codec = JsonCodec.builder().build()) {
+        try (var codec = builder.build()) {
             var de = codec.createDeserializer(json);
             var document = de.readDocument();
 
@@ -313,52 +336,74 @@ public class JsonDeserializerTest {
     public static List<Arguments> deserializesWithTimestampFormatSource() {
         var epochSeconds = Double.toString(((double) Instant.EPOCH.toEpochMilli()) / 1000);
 
-        return List.of(
-            // boolean useTrait, TimestampFormatTrait trait, TimestampFormatter defaultFormat, String json
-            Arguments.of(false, null, null, epochSeconds),
-            Arguments.of(false, new TimestampFormatTrait(TimestampFormatTrait.EPOCH_SECONDS), null, epochSeconds),
-            Arguments.of(
-                false,
-                new TimestampFormatTrait(TimestampFormatTrait.EPOCH_SECONDS),
-                TimestampFormatter.Prelude.EPOCH_SECONDS,
-                epochSeconds
-            ),
-            Arguments.of(
-                true,
-                new TimestampFormatTrait(TimestampFormatTrait.EPOCH_SECONDS),
-                TimestampFormatter.Prelude.EPOCH_SECONDS,
-                epochSeconds
-            ),
-            Arguments.of(true, new TimestampFormatTrait(TimestampFormatTrait.EPOCH_SECONDS), null, epochSeconds),
-            Arguments.of(
-                true,
-                new TimestampFormatTrait(TimestampFormatTrait.EPOCH_SECONDS),
-                TimestampFormatter.Prelude.DATE_TIME,
-                epochSeconds
-            ),
-            Arguments.of(
-                false,
-                new TimestampFormatTrait(TimestampFormatTrait.EPOCH_SECONDS),
-                TimestampFormatter.Prelude.DATE_TIME,
-                "\"" + Instant.EPOCH + "\""
-            ),
-            Arguments.of(
-                true,
-                new TimestampFormatTrait(TimestampFormatTrait.DATE_TIME),
-                TimestampFormatter.Prelude.EPOCH_SECONDS,
-                "\"" + Instant.EPOCH + "\""
+        return JsonTestData.builders()
+            .flatMap(
+                a -> Stream.of(
+                    // boolean useTrait, TimestampFormatTrait trait, TimestampFormatter defaultFormat, String json
+                    Arguments.of(false, null, null, epochSeconds, a.get()[0]),
+                    Arguments.of(
+                        false,
+                        new TimestampFormatTrait(TimestampFormatTrait.EPOCH_SECONDS),
+                        null,
+                        epochSeconds,
+                        a.get()[0]
+                    ),
+                    Arguments.of(
+                        false,
+                        new TimestampFormatTrait(TimestampFormatTrait.EPOCH_SECONDS),
+                        TimestampFormatter.Prelude.EPOCH_SECONDS,
+                        epochSeconds,
+                        a.get()[0]
+                    ),
+                    Arguments.of(
+                        true,
+                        new TimestampFormatTrait(TimestampFormatTrait.EPOCH_SECONDS),
+                        TimestampFormatter.Prelude.EPOCH_SECONDS,
+                        epochSeconds,
+                        a.get()[0]
+                    ),
+                    Arguments.of(
+                        true,
+                        new TimestampFormatTrait(TimestampFormatTrait.EPOCH_SECONDS),
+                        null,
+                        epochSeconds,
+                        a.get()[0]
+                    ),
+                    Arguments.of(
+                        true,
+                        new TimestampFormatTrait(TimestampFormatTrait.EPOCH_SECONDS),
+                        TimestampFormatter.Prelude.DATE_TIME,
+                        epochSeconds,
+                        a.get()[0]
+                    ),
+                    Arguments.of(
+                        false,
+                        new TimestampFormatTrait(TimestampFormatTrait.EPOCH_SECONDS),
+                        TimestampFormatter.Prelude.DATE_TIME,
+                        "\"" + Instant.EPOCH + "\"",
+                        a.get()[0]
+                    ),
+                    Arguments.of(
+                        true,
+                        new TimestampFormatTrait(TimestampFormatTrait.DATE_TIME),
+                        TimestampFormatter.Prelude.EPOCH_SECONDS,
+                        "\"" + Instant.EPOCH + "\"",
+                        a.get()[0]
+                    )
+                )
             )
-        );
+            .toList();
     }
 
-    @Test
-    public void throwsWhenTimestampIsWrongType() {
+    @ParameterizedTest
+    @MethodSource("software.amazon.smithy.java.runtime.json.JsonTestData#builders")
+    public void throwsWhenTimestampIsWrongType(JsonCodec.Builder builder) {
         Schema schema = Schema.builder()
             .type(ShapeType.TIMESTAMP)
             .id("smithy.foo#Time")
             .build();
 
-        try (var codec = JsonCodec.builder().build()) {
+        try (var codec = builder.build()) {
             var de = codec.createDeserializer("true".getBytes(StandardCharsets.UTF_8));
             var e = Assertions.assertThrows(SerializationException.class, () -> de.readTimestamp(schema));
             assertThat(e.getMessage(), equalTo("Expected a timestamp, but found boolean"));

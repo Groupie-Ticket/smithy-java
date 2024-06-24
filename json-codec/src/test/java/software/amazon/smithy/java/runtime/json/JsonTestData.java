@@ -5,8 +5,14 @@
 
 package software.amazon.smithy.java.runtime.json;
 
+import static org.junit.jupiter.params.provider.Arguments.arguments;
+
+import java.util.stream.Stream;
+import org.junit.jupiter.params.provider.Arguments;
 import software.amazon.smithy.java.runtime.core.schema.PreludeSchemas;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
+import software.amazon.smithy.java.runtime.json.iter.JsonIterJsonSerdeProvider;
+import software.amazon.smithy.java.runtime.json.jackson.JacksonJsonSerdeProvider;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
 import software.amazon.smithy.model.traits.JsonNameTrait;
@@ -37,4 +43,11 @@ public final class JsonTestData {
         .type(ShapeType.STRUCTURE)
         .members(NESTED_NUMBER)
         .build();
+
+    static Stream<Arguments> builders() {
+        return Stream.of(
+            arguments(JsonCodec.builder().overrideSerdeProvider(new JacksonJsonSerdeProvider())),
+            arguments(JsonCodec.builder().overrideSerdeProvider(new JsonIterJsonSerdeProvider()))
+        );
+    }
 }

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.json;
+package software.amazon.smithy.java.runtime.json.iter;
 
 import com.jsoniter.JsonIterator;
 import com.jsoniter.ValueType;
@@ -16,15 +16,17 @@ import java.util.function.Consumer;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
+import software.amazon.smithy.java.runtime.json.JsonFieldMapper;
+import software.amazon.smithy.java.runtime.json.TimestampResolver;
 
-final class JsonDeserializer implements ShapeDeserializer {
+final class JsonIterDeserializer implements ShapeDeserializer {
 
     private JsonIterator iter;
     private final TimestampResolver timestampResolver;
     private final JsonFieldMapper fieldMapper;
     private final Consumer<JsonIterator> returnHandle;
 
-    JsonDeserializer(
+    JsonIterDeserializer(
         JsonIterator iter,
         TimestampResolver timestampResolver,
         JsonFieldMapper fieldMapper,
@@ -159,14 +161,14 @@ final class JsonDeserializer implements ShapeDeserializer {
     }
 
     @Override
-    public JsonDocument readDocument() {
+    public JsonIterDocument readDocument() {
         try {
             var any = iter.readAny().mustBeValid();
             // Return a regular null here if the result was null.
             if (any.valueType() == ValueType.NULL) {
                 return null;
             } else {
-                return new JsonDocument(any, fieldMapper, timestampResolver);
+                return new JsonIterDocument(any, fieldMapper, timestampResolver);
             }
         } catch (Exception e) {
             throw new SerializationException(e);

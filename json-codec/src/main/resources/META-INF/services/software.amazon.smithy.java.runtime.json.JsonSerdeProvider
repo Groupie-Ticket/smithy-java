@@ -1,0 +1,2 @@
+software.amazon.smithy.java.runtime.json.jackson.JacksonJsonSerdeProvider
+software.amazon.smithy.java.runtime.json.iter.JsonIterJsonSerdeProvider

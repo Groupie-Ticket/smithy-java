@@ -19,7 +19,7 @@ import software.amazon.smithy.model.traits.TimestampFormatTrait;
 /**
  * Resolves the timestamp format to use for a shape.
  */
-sealed interface TimestampResolver {
+public sealed interface TimestampResolver {
     /**
      * Determine the formatter of a shape.
      *
@@ -57,6 +57,26 @@ sealed interface TimestampResolver {
         } catch (JsonException e) {
             throw new SerializationException(e);
         }
+    }
+
+    /**
+     * Reusable method to parse timestamps from an iterator using a specific formatter.
+     *
+     * @param any    JSON any type to read from.
+     * @param format Formatter used to parse the timestamp.
+     * @return the parsed Instant.
+     * @throws SerializationException if the timestamp format or type is invalid.
+     */
+    static Instant readTimestamp(Object any, TimestampFormatter format) {
+        if (any instanceof Number) {
+            return format.readFromNumber(((Number) any).doubleValue());
+        }
+        if (any instanceof String) {
+            return format.readFromString((String) any, true);
+        }
+        throw new SerializationException(
+            "Expected a timestamp, but found " + any.getClass().getSimpleName()
+        );
     }
 
     /**

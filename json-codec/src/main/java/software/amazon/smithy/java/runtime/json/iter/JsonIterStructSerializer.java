@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.json;
+package software.amazon.smithy.java.runtime.json.iter;
 
 import com.jsoniter.spi.JsonException;
 import java.io.IOException;
@@ -18,12 +18,12 @@ import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 
-class JsonStructSerializer implements ShapeSerializer {
+class JsonIterStructSerializer implements ShapeSerializer {
 
-    private final JsonSerializer parent;
+    private final JsonIterSerializer parent;
     private boolean firstValue;
 
-    JsonStructSerializer(JsonSerializer parent, boolean isFirstValue) {
+    JsonIterStructSerializer(JsonIterSerializer parent, boolean isFirstValue) {
         this.parent = parent;
         this.firstValue = isFirstValue;
     }

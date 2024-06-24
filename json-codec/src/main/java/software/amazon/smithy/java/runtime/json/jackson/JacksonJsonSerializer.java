@@ -3,15 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.json;
+package software.amazon.smithy.java.runtime.json.jackson;
 
-import com.jsoniter.output.JsonStream;
+import com.fasterxml.jackson.core.JsonGenerator;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.ListSerializer;
@@ -20,31 +19,30 @@ import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
+import software.amazon.smithy.java.runtime.json.JsonFieldMapper;
+import software.amazon.smithy.java.runtime.json.TimestampResolver;
 import software.amazon.smithy.model.shapes.ShapeType;
 
-final class JsonSerializer implements ShapeSerializer {
+final class JacksonJsonSerializer implements ShapeSerializer {
 
-    JsonStream stream;
+    JsonGenerator generator;
     final JsonFieldMapper fieldMapper;
     final TimestampResolver timestampResolver;
-    private final Consumer<JsonStream> returnHandle;
 
-    JsonSerializer(
-        JsonStream stream,
+    JacksonJsonSerializer(
+        JsonGenerator generator,
         JsonFieldMapper fieldMapper,
-        TimestampResolver timestampResolver,
-        Consumer<JsonStream> returnHandle
+        TimestampResolver timestampResolver
     ) {
-        this.stream = stream;
+        this.generator = generator;
         this.timestampResolver = timestampResolver;
         this.fieldMapper = fieldMapper;
-        this.returnHandle = returnHandle;
     }
 
     @Override
     public void flush() {
         try {
-            stream.flush();
+            generator.flush();
         } catch (Exception e) {
             throw new SerializationException(e);
         }
@@ -53,9 +51,8 @@ final class JsonSerializer implements ShapeSerializer {
     @Override
     public void close() {
         try {
-            stream.close();
-            returnHandle.accept(stream);
-            stream = null;
+            generator.close();
+            generator = null;
         } catch (Exception e) {
             throw new SerializationException(e);
         }
@@ -64,7 +61,7 @@ final class JsonSerializer implements ShapeSerializer {
     @Override
     public void writeBoolean(Schema schema, boolean value) {
         try {
-            stream.writeVal(value);
+            generator.writeBoolean(value);
         } catch (Exception e) {
             throw new SerializationException(e);
         }
@@ -73,7 +70,7 @@ final class JsonSerializer implements ShapeSerializer {
     @Override
     public void writeByte(Schema schema, byte value) {
         try {
-            stream.writeVal(value);
+            generator.writeNumber(value);
         } catch (Exception e) {
             throw new SerializationException(e);
         }
@@ -82,7 +79,7 @@ final class JsonSerializer implements ShapeSerializer {
     @Override
     public void writeShort(Schema schema, short value) {
         try {
-            stream.writeVal(value);
+            generator.writeNumber(value);
         } catch (Exception e) {
             throw new SerializationException(e);
         }
@@ -91,7 +88,7 @@ final class JsonSerializer implements ShapeSerializer {
     @Override
     public void writeBlob(Schema schema, byte[] value) {
         try {
-            stream.writeVal(Base64.getEncoder().encodeToString(value));
+            generator.writeString(Base64.getEncoder().encodeToString(value));
         } catch (Exception e) {
             throw new SerializationException(e);
         }
@@ -100,7 +97,7 @@ final class JsonSerializer implements ShapeSerializer {
     @Override
     public void writeInteger(Schema schema, int value) {
         try {
-            stream.writeVal(value);
+            generator.writeNumber(value);
         } catch (Exception e) {
             throw new SerializationException(e);
         }
@@ -109,7 +106,7 @@ final class JsonSerializer implements ShapeSerializer {
     @Override
     public void writeLong(Schema schema, long value) {
         try {
-            stream.writeVal(value);
+            generator.writeNumber(value);
         } catch (Exception e) {
             throw new SerializationException(e);
         }
@@ -119,15 +116,20 @@ final class JsonSerializer implements ShapeSerializer {
     public void writeFloat(Schema schema, float value) {
         try {
             if (Float.isNaN(value)) {
-                stream.writeVal("NaN");
+                generator.writeString("NaN");
             } else if (Float.isInfinite(value)) {
                 if (Float.POSITIVE_INFINITY == value) {
-                    stream.writeVal("Infinity");
+                    generator.writeString("Infinity");
                 } else {
-                    stream.writeVal("-Infinity");
+                    generator.writeString("-Infinity");
                 }
             } else {
-                stream.writeVal(value);
+                int intValue = (int) value;
+                if (value - intValue > 0) {
+                    generator.writeNumber(value);
+                } else {
+                    generator.writeNumber(intValue);
+                }
             }
         } catch (Exception e) {
             throw new SerializationException(e);
@@ -138,15 +140,20 @@ final class JsonSerializer implements ShapeSerializer {
     public void writeDouble(Schema schema, double value) {
         try {
             if (Double.isNaN(value)) {
-                stream.writeVal("NaN");
+                generator.writeString("NaN");
             } else if (Double.isInfinite(value)) {
                 if (Double.POSITIVE_INFINITY == value) {
-                    stream.writeVal("Infinity");
+                    generator.writeString("Infinity");
                 } else {
-                    stream.writeVal("-Infinity");
+                    generator.writeString("-Infinity");
                 }
             } else {
-                stream.writeVal(value);
+                long longValue = (long) value;
+                if (value - longValue > 0) {
+                    generator.writeNumber(value);
+                } else {
+                    generator.writeNumber(longValue);
+                }
             }
         } catch (Exception e) {
             throw new SerializationException(e);
@@ -156,7 +163,7 @@ final class JsonSerializer implements ShapeSerializer {
     @Override
     public void writeBigInteger(Schema schema, BigInteger value) {
         try {
-            stream.writeVal(value);
+            generator.writeNumber(value);
         } catch (Exception e) {
             throw new SerializationException(e);
         }
@@ -165,7 +172,7 @@ final class JsonSerializer implements ShapeSerializer {
     @Override
     public void writeBigDecimal(Schema schema, BigDecimal value) {
         try {
-            stream.writeVal(value);
+            generator.writeNumber(value);
         } catch (Exception e) {
             throw new SerializationException(e);
         }
@@ -174,7 +181,7 @@ final class JsonSerializer implements ShapeSerializer {
     @Override
     public void writeString(Schema schema, String value) {
         try {
-            stream.writeVal(value);
+            generator.writeString(value);
         } catch (Exception e) {
             throw new SerializationException(e);
         }
@@ -188,9 +195,9 @@ final class JsonSerializer implements ShapeSerializer {
     @Override
     public void writeStruct(Schema schema, SerializableStruct struct) {
         try {
-            stream.writeObjectStart();
-            struct.serializeMembers(new JsonStructSerializer(this, true));
-            stream.writeObjectEnd();
+            generator.writeStartObject();
+            struct.serializeMembers(new JacksonStructSerializer(this));
+            generator.writeEndObject();
         } catch (Exception e) {
             throw new SerializationException(e);
         }
@@ -199,30 +206,20 @@ final class JsonSerializer implements ShapeSerializer {
     @Override
     public <T> void writeList(Schema schema, T listState, BiConsumer<T, ShapeSerializer> consumer) {
         try {
-            stream.writeArrayStart();
-            consumer.accept(listState, new ListSerializer(this, this::writeComma));
-            stream.writeArrayEnd();
+            generator.writeStartArray();
+            consumer.accept(listState, new ListSerializer(this, (pos) -> {}));
+            generator.writeEndArray();
         } catch (Exception e) {
             throw new SerializationException(e);
-        }
-    }
-
-    private void writeComma(int position) {
-        if (position > 0) {
-            try {
-                stream.writeMore();
-            } catch (Exception e) {
-                throw new SerializationException(e);
-            }
         }
     }
 
     @Override
     public <T> void writeMap(Schema schema, T mapState, BiConsumer<T, MapSerializer> consumer) {
         try {
-            stream.writeObjectStart();
-            consumer.accept(mapState, new JsonMapSerializer(this, stream));
-            stream.writeObjectEnd();
+            generator.writeStartObject();
+            consumer.accept(mapState, new JacksonMapSerializer(this));
+            generator.writeEndObject();
         } catch (Exception e) {
             throw new SerializationException(e);
         }
@@ -238,11 +235,10 @@ final class JsonSerializer implements ShapeSerializer {
                 @Override
                 public void writeStruct(Schema schema, SerializableStruct struct) {
                     try {
-                        stream.writeObjectStart();
-                        stream.writeObjectField("__type");
-                        stream.writeVal(schema.id().toString());
-                        struct.serializeMembers(new JsonStructSerializer(JsonSerializer.this, false));
-                        stream.writeObjectEnd();
+                        generator.writeStartObject();
+                        generator.writeStringField("__type", schema.id().toString());
+                        struct.serializeMembers(new JacksonStructSerializer(JacksonJsonSerializer.this));
+                        generator.writeEndObject();
                     } catch (Exception e) {
                         throw new SerializationException(e);
                     }
@@ -254,7 +250,7 @@ final class JsonSerializer implements ShapeSerializer {
     @Override
     public void writeNull(Schema schema) {
         try {
-            stream.writeNull();
+            generator.writeNull();
         } catch (Exception e) {
             throw new SerializationException(e);
         }
