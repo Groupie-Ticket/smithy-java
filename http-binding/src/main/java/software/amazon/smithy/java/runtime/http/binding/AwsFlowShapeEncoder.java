@@ -14,10 +14,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import software.amazon.eventstream.HeaderValue;
 import software.amazon.eventstream.Message;
-import software.amazon.smithy.java.runtime.core.schema.EventStreamingException;
-import software.amazon.smithy.java.runtime.core.schema.ModeledApiException;
-import software.amazon.smithy.java.runtime.core.schema.Schema;
-import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
+import software.amazon.smithy.java.runtime.core.schema.*;
 import software.amazon.smithy.java.runtime.core.serde.Codec;
 import software.amazon.smithy.java.runtime.core.serde.EventEncoder;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
@@ -30,8 +27,13 @@ public final class AwsFlowShapeEncoder<T extends SerializableStruct> implements 
     private final Codec codec;
     private final Set<String> possibleTypes;
     private final Map<ShapeId, Schema> possibleExceptions;
+    private final Function<Throwable, EventStreamingException> exceptionHandler;
 
-    public AwsFlowShapeEncoder(Schema eventSchema, Codec codec) {
+    public AwsFlowShapeEncoder(
+        Schema eventSchema,
+        Codec codec,
+        Function<Throwable, EventStreamingException> exceptionHandler
+    ) {
         this.eventSchema = eventSchema;
         this.codec = codec;
         this.possibleTypes = eventSchema.members().stream().map(Schema::memberName).collect(Collectors.toSet());
@@ -39,6 +41,7 @@ public final class AwsFlowShapeEncoder<T extends SerializableStruct> implements 
             .stream()
             .filter(s -> s.hasTrait(ErrorTrait.class))
             .collect(Collectors.toMap(s -> s.memberTarget().id(), Function.identity()));
+        this.exceptionHandler = exceptionHandler;
     }
 
     @Override
@@ -87,12 +90,7 @@ public final class AwsFlowShapeEncoder<T extends SerializableStruct> implements 
             }
             frame = new AwsFlowFrame(new Message(headers, os.toByteArray()));
         } else {
-            EventStreamingException es;
-            if (exception instanceof EventStreamingException e) {
-                es = e;
-            } else {
-                es = new EventStreamingException("InternalServerError", "internal server error");
-            }
+            EventStreamingException es = exceptionHandler.apply(exception);
             var headers = new HashMap<String, HeaderValue>();
             headers.put(":message-type", HeaderValue.fromString("error"));
             headers.put(":error-code", HeaderValue.fromString(es.getErrorCode()));
