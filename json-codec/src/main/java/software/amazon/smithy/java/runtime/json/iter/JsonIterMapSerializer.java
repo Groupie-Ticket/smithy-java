@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.json;
+package software.amazon.smithy.java.runtime.json.iter;
 
 import com.jsoniter.output.JsonStream;
 import com.jsoniter.spi.JsonException;
@@ -14,13 +14,13 @@ import software.amazon.smithy.java.runtime.core.serde.MapSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 
-final class JsonMapSerializer implements MapSerializer {
+final class JsonIterMapSerializer implements MapSerializer {
 
     private final ShapeSerializer parent;
     private final JsonStream stream;
     private boolean wroteValue = false;
 
-    JsonMapSerializer(ShapeSerializer parent, JsonStream stream) {
+    JsonIterMapSerializer(ShapeSerializer parent, JsonStream stream) {
         this.parent = parent;
         this.stream = stream;
     }

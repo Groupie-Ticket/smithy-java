@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package software.amazon.smithy.java.runtime.json;
+package software.amazon.smithy.java.runtime.json.iter;
 
 import com.jsoniter.ValueType;
 import com.jsoniter.any.Any;
@@ -24,9 +24,11 @@ import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.java.runtime.core.serde.document.DocumentDeserializer;
+import software.amazon.smithy.java.runtime.json.JsonFieldMapper;
+import software.amazon.smithy.java.runtime.json.TimestampResolver;
 import software.amazon.smithy.model.shapes.ShapeType;
 
-final class JsonDocument implements Document {
+final class JsonIterDocument implements Document {
 
     private static final Schema STRING_MAP_KEY = Schema.memberBuilder("key", PreludeSchemas.STRING)
         .id(PreludeSchemas.DOCUMENT.id())
@@ -38,7 +40,7 @@ final class JsonDocument implements Document {
     private final ShapeType type;
     private final Schema schema;
 
-    JsonDocument(
+    JsonIterDocument(
         com.jsoniter.any.Any any,
         JsonFieldMapper fieldMapper,
         TimestampResolver timestampResolver
@@ -150,7 +152,7 @@ final class JsonDocument implements Document {
 
         List<Document> result = new ArrayList<>();
         for (var value : any) {
-            result.add(new JsonDocument(value, fieldMapper, timestampResolver));
+            result.add(new JsonIterDocument(value, fieldMapper, timestampResolver));
         }
 
         return result;
@@ -165,7 +167,7 @@ final class JsonDocument implements Document {
             for (var entry : any.asMap().entrySet()) {
                 result.put(
                     entry.getKey(),
-                    new JsonDocument(entry.getValue(), fieldMapper, timestampResolver)
+                    new JsonIterDocument(entry.getValue(), fieldMapper, timestampResolver)
                 );
             }
             return result;
@@ -177,7 +179,7 @@ final class JsonDocument implements Document {
         if (any.valueType() == ValueType.OBJECT) {
             var memberDocument = any.get(memberName);
             if (memberDocument.valueType() != ValueType.NULL && memberDocument.valueType() != ValueType.INVALID) {
-                return new JsonDocument(memberDocument, fieldMapper, timestampResolver);
+                return new JsonIterDocument(memberDocument, fieldMapper, timestampResolver);
             }
         }
         return null;
@@ -223,7 +225,7 @@ final class JsonDocument implements Document {
         } else if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        JsonDocument that = (JsonDocument) o;
+        JsonIterDocument that = (JsonIterDocument) o;
         return type == that.type
             && fieldMapper.getClass() == that.fieldMapper.getClass()
             && timestampResolver.equals(that.timestampResolver)
@@ -246,16 +248,16 @@ final class JsonDocument implements Document {
      */
     private static final class JsonDocumentDeserializer extends DocumentDeserializer {
 
-        private final JsonDocument jsonDocument;
+        private final JsonIterDocument jsonDocument;
 
-        JsonDocumentDeserializer(JsonDocument value) {
+        JsonDocumentDeserializer(JsonIterDocument value) {
             super(value);
             this.jsonDocument = value;
         }
 
         @Override
         protected DocumentDeserializer deserializer(Document nextValue) {
-            return new JsonDocumentDeserializer((JsonDocument) nextValue);
+            return new JsonDocumentDeserializer((JsonIterDocument) nextValue);
         }
 
         @Override
