@@ -109,8 +109,8 @@ public class AutoloopServer {
                     return Flowable.error(event.getError());
                 }
                 try {
-                    return Flowable.fromIterable(
-                        List.of(edgeEventProcessor.process(event.getValue(), createAttributeSyncStreamInput))
+                    return Flowable.just(
+                            edgeEventProcessor.process(event.getValue(), createAttributeSyncStreamInput)
                     );
                 } catch (UnsupportedOperationException | IllegalStateException e) {
                     return Flowable.error(InternalServerException.builder().message(e.getMessage()).build());
