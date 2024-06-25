@@ -69,12 +69,8 @@ public final class HttpBindingSerializer extends SpecificShapeSerializer impleme
         BindingMatcher bindingMatcher,
         DataStream httpPayload
     ) {
-        if (httpTrait != null) {
-            uriPattern = httpTrait.getUri();
-            responseStatus = httpTrait.getCode();
-        } else {
-            uriPattern = null;
-        }
+        uriPattern = httpTrait.getUri();
+        responseStatus = httpTrait.getCode();
         this.payloadCodec = payloadCodec;
         this.bindingMatcher = bindingMatcher;
         headerSerializer = new HttpHeaderSerializer(headerConsumer);

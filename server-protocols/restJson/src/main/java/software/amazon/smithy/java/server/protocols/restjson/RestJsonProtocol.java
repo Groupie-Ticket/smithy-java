@@ -224,7 +224,7 @@ public final class RestJsonProtocol extends ServerProtocol {
             schema = apiOperation.outputSchema();
         }
         HttpBindingSerializer serializer = new HttpBindingSerializer(
-            schema.getTrait(HttpTrait.class),
+            apiOperation.schema().expectTrait(HttpTrait.class),
             codec,
             BindingMatcher.responseMatcher(),
             null
