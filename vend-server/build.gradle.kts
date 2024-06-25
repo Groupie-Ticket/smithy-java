@@ -10,6 +10,19 @@ plugins {
     alias(libs.plugins.shadow)
 }
 
+buildscript {
+    configurations {
+        val asmVersion = "9.6"
+        classpath {
+            resolutionStrategy {
+                //in order to handle jackson's higher release version in shadow, this needs to be upgraded to latest.
+                force( "org.ow2.asm:asm:${asmVersion}")
+                force("org.ow2.asm:asm-commons:${asmVersion}")
+            }
+        }
+    }
+}
+
 val shadePrefix = "software.amazon.smithy.java.internal"
 
 description = "This module is just used from bundling"
@@ -29,6 +42,7 @@ val uberJar = tasks.register<ShadowJar>("uberJar") {
     archiveClassifier.set("all")
     relocate("io.netty", "${shadePrefix}.netty")
     relocate("com.jsoniter", "${shadePrefix}.jsoniter")
+    relocate("com.fasterxml.jackson", "${shadePrefix}.com.fasterxml.jackson")
     relocate("META-INF/native/libnetty", "META-INF/native/lib${shadePrefix.replace('.', '_')}_netty")
     relocate("META-INF/native/netty", "META-INF/native/${shadePrefix.replace('.', '_')}_netty")
     exclude("META-INF/maven/**")
