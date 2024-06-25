@@ -42,8 +42,16 @@ record StructureDeserializerGenerator(
                         ${cases:C|}
                     }${/hasMembers}
                 }
+
+                ${?union}
+                @Override
+                public void unknownMember(Builder builder) {
+                    builder.${unknownMethod:L}();
+                }
+                ${/union}
             }
             """;
+        writer.putContext("unknownMethod", "$$unknown");
         writer.putContext("shapeDeserializer", ShapeDeserializer.class);
         writer.putContext("sdkSchema", Schema.class);
         writer.putContext(
@@ -54,6 +62,7 @@ record StructureDeserializerGenerator(
                 .anyMatch(not(t -> CodegenUtils.isStreamingBlob(t) || CodegenUtils.isEventStream(t)))
         );
         writer.putContext("cases", writer.consumer(this::generateMemberSwitchCases));
+        writer.putContext("union", shape.isUnionShape());
         writer.write(template);
         writer.popState();
     }

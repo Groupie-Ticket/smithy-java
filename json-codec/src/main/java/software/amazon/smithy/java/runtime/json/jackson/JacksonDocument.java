@@ -28,7 +28,7 @@ import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
 import software.amazon.smithy.java.runtime.core.serde.document.DocumentDeserializer;
-import software.amazon.smithy.java.runtime.json.JsonFieldMapper;
+import software.amazon.smithy.java.runtime.json.JsonCodec;
 import software.amazon.smithy.java.runtime.json.TimestampResolver;
 import software.amazon.smithy.model.shapes.ShapeType;
 
@@ -39,19 +39,16 @@ final class JacksonDocument implements Document {
         .build();
 
     private final JsonNode root;
-    private final JsonFieldMapper fieldMapper;
-    private final TimestampResolver timestampResolver;
+    private final JsonCodec.Settings settings;
     private final ShapeType type;
     private final Schema schema;
 
     JacksonDocument(
         JsonNode root,
-        JsonFieldMapper fieldMapper,
-        TimestampResolver timestampResolver
+        JsonCodec.Settings settings
     ) {
         this.root = root;
-        this.fieldMapper = fieldMapper;
-        this.timestampResolver = timestampResolver;
+        this.settings = settings;
 
         // Determine the type from the underlying JSON value.
         this.type = switch (root.getNodeType()) {
@@ -159,7 +156,7 @@ final class JacksonDocument implements Document {
             throw new SerializationException("Expected a timestamp, but found " + type());
         }
         // Always use the default JSON timestamp format with untyped documents.
-        return TimestampResolver.readTimestamp(val, timestampResolver.defaultFormat());
+        return TimestampResolver.readTimestamp(val, settings.timestampResolver().defaultFormat());
     }
 
     @Override
@@ -170,7 +167,7 @@ final class JacksonDocument implements Document {
 
         List<Document> result = new ArrayList<>();
         for (int i = 0; i < root.size(); i++) {
-            result.add(new JacksonDocument(root.get(i), fieldMapper, timestampResolver));
+            result.add(new JacksonDocument(root.get(i), settings));
         }
 
         return result;
@@ -184,7 +181,7 @@ final class JacksonDocument implements Document {
             Map<String, Document> result = new LinkedHashMap<>();
             for (Iterator<String> iter = root.fieldNames(); iter.hasNext();) {
                 var key = iter.next();
-                result.put(key, new JacksonDocument(root.get(key), fieldMapper, timestampResolver));
+                result.put(key, new JacksonDocument(root.get(key), settings));
             }
             return result;
         }
@@ -197,7 +194,7 @@ final class JacksonDocument implements Document {
             if (memberDocument != null &&
                 memberDocument.getNodeType() != NULL
                 && memberDocument.getNodeType() != MISSING) {
-                return new JacksonDocument(memberDocument, fieldMapper, timestampResolver);
+                return new JacksonDocument(memberDocument, settings);
             }
         }
         return null;
@@ -245,20 +242,20 @@ final class JacksonDocument implements Document {
         }
         JacksonDocument that = (JacksonDocument) o;
         return type == that.type
-            && fieldMapper.getClass() == that.fieldMapper.getClass()
-            && timestampResolver.equals(that.timestampResolver)
+            && settings.fieldMapper().getClass() == that.settings.fieldMapper().getClass()
+            && settings.timestampResolver().equals(that.settings.timestampResolver())
             && root.equals(that.root);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(type, root, timestampResolver);
+        return Objects.hash(type, root, settings.timestampResolver());
     }
 
     @Override
     public String toString() {
-        return "JsonDocument{root=" + root + ", timestampResolver=" + timestampResolver
-            + ", memberToField=" + fieldMapper + '}';
+        return "JsonDocument{root=" + root + ", settings.timestampResolver()=" + settings.timestampResolver()
+            + ", memberToField=" + settings.fieldMapper() + '}';
     }
 
     /**
@@ -281,7 +278,7 @@ final class JacksonDocument implements Document {
         @Override
         public <T> void readStruct(Schema schema, T state, StructMemberConsumer<T> structMemberConsumer) {
             for (var member : schema.members()) {
-                var nextValue = jsonDocument.getMember(jsonDocument.fieldMapper.memberToField(member));
+                var nextValue = jsonDocument.getMember(jsonDocument.settings.fieldMapper().memberToField(member));
                 if (nextValue != null) {
                     structMemberConsumer.accept(state, member, deserializer(nextValue));
                 }
@@ -290,7 +287,7 @@ final class JacksonDocument implements Document {
 
         @Override
         public Instant readTimestamp(Schema schema) {
-            var format = jsonDocument.timestampResolver.resolve(schema);
+            var format = jsonDocument.settings.timestampResolver().resolve(schema);
             return TimestampResolver.readTimestamp(
                 jsonDocument.root.isNumber()
                     ? jsonDocument.root.numberValue()

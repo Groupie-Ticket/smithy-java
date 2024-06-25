@@ -16,6 +16,7 @@ import software.amazon.smithy.java.codegen.CodegenUtils;
 import software.amazon.smithy.java.codegen.JavaCodegenSettings;
 import software.amazon.smithy.java.codegen.SymbolProperties;
 import software.amazon.smithy.java.codegen.sections.ClassSection;
+import software.amazon.smithy.java.codegen.sections.UnknownVariantSection;
 import software.amazon.smithy.java.codegen.writer.JavaWriter;
 import software.amazon.smithy.java.runtime.core.schema.SerializableStruct;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
@@ -124,7 +125,6 @@ public final class UnionGenerator
                     """);
                 writer.popState();
             }
-            // TODO: Add in unknown variant
             writer.popState();
         }
     }
@@ -184,7 +184,46 @@ public final class UnionGenerator
                 writer.write(template);
                 writer.popState();
             }
-            // TODO: Add in unknown variant
+            writer.pushState();
+            writer.injectSection(new UnknownVariantSection());
+            var template = """
+                public static final class ${unknownClassName:L} extends ${shape:T} {
+
+                    public ${unknownClassName:L}() {
+                        super(Type.${enumValue:L});
+                    }
+
+                    @Override
+                    public void serialize(${shapeSerializer:T} serializer) {
+                        throw new ${serdeException:T}("Cannot serialize unknown union");
+                    }
+
+                    @Override
+                    public void serializeMembers(${shapeSerializer:T} serializer) {}
+
+                    @Override
+                    public boolean equals(${object:T} other) {
+                        if (other == this) {
+                            return true;
+                        }
+                        if (other == null || getClass() != other.getClass()) {
+                            return false;
+                        }
+                        return true;
+                    }
+
+                    @Override
+                    public int hashCode() {
+                        return 31;
+                    }
+                }
+                """;
+            writer.putContext("serdeException", SerializationException.class);
+            writer.putContext("object", Object.class);
+            writer.putContext("enumValue", "$$UNKNOWN");
+            writer.putContext("unknownClassName", "$$UnknownMember");
+            writer.write(template);
+            writer.popState();
             writer.popState();
         }
     }
@@ -269,6 +308,7 @@ public final class UnionGenerator
         @Override
         protected void generateProperties(JavaWriter writer) {
             writer.write("private ${shape:T} value;");
+            writer.write("private boolean unknown;");
         }
 
         @Override
@@ -294,9 +334,19 @@ public final class UnionGenerator
                     if (this.value != null) {
                         throw new ${serdeException:T}("Only one value may be set for unions");
                     }
+                    if (this.unknown) {
+                        throw new ${serdeException:T}("Cannot set value on unknown union.");
+                    }
                 }
                 """);
-            // TODO: Add unknown setter
+            writer.putContext("unknownMethod", "$$unknown");
+            writer.write("""
+                private BuildStage ${unknownMethod:L}() {
+                    checkForExistingValue();
+                    this.unknown = true;
+                    return this;
+                }
+                """);
             writer.popState();
         }
 
@@ -318,9 +368,13 @@ public final class UnionGenerator
         protected void generateBuild(JavaWriter writer) {
             writer.pushState();
             writer.putContext("objects", Objects.class);
+            writer.putContext("unknownClassName", "$$UnknownMember");
             writer.write("""
                 @Override
                 public ${shape:T} build() {
+                    if (this.unknown) {
+                        return new ${unknownClassName:L}();
+                    }
                     return ${objects:T}.requireNonNull(value, "no union value set");
                 }
                 """);

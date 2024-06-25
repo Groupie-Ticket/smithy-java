@@ -21,23 +21,21 @@ import java.util.Locale;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
-import software.amazon.smithy.java.runtime.json.JsonFieldMapper;
+import software.amazon.smithy.java.runtime.json.JsonCodec;
 import software.amazon.smithy.java.runtime.json.TimestampResolver;
+import software.amazon.smithy.model.shapes.ShapeType;
 
 final class JacksonJsonDeserializer implements ShapeDeserializer {
 
     private JsonParser parser;
-    private final TimestampResolver timestampResolver;
-    private final JsonFieldMapper fieldMapper;
+    private final JsonCodec.Settings settings;
 
     JacksonJsonDeserializer(
         JsonParser parser,
-        JsonFieldMapper fieldMapper,
-        TimestampResolver timestampResolver
+        JsonCodec.Settings settings
     ) {
         this.parser = parser;
-        this.timestampResolver = timestampResolver;
-        this.fieldMapper = fieldMapper;
+        this.settings = settings;
         try {
             this.parser.nextToken();
         } catch (IOException e) {
@@ -169,7 +167,7 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
     @Override
     public JacksonDocument readDocument() {
         try {
-            return new JacksonDocument(parser.readValueAsTree(), fieldMapper, timestampResolver);
+            return new JacksonDocument(parser.readValueAsTree(), settings);
         } catch (Exception e) {
             throw new SerializationException(e);
         }
@@ -178,7 +176,7 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
     @Override
     public Instant readTimestamp(Schema schema) {
         try {
-            var format = timestampResolver.resolve(schema);
+            var format = settings.timestampResolver().resolve(schema);
             if (parser.getCurrentToken() == JsonToken.VALUE_NUMBER_FLOAT
                 || parser.getCurrentToken() == JsonToken.VALUE_NUMBER_INT) {
                 return TimestampResolver.readTimestamp(parser.getNumberValue(), format);
@@ -204,9 +202,17 @@ final class JacksonJsonDeserializer implements ShapeDeserializer {
                 parser.nextToken();
             }
             for (var token = parser.nextToken(); token != END_OBJECT; token = parser.nextToken()) {
-                var member = fieldMapper.fieldToMember(schema, parser.getText());
+                var memberName = parser.getText();
+                var member = settings.fieldMapper().fieldToMember(schema, memberName);
                 token = parser.nextToken();
                 if (member == null) {
+                    if (schema.type() == ShapeType.UNION) {
+                        if (settings.allowUnknownUnionMembers()) {
+                            structMemberConsumer.unknownMember(state);
+                        } else {
+                            throw new SerializationException("Unknown member " + memberName + " encountered");
+                        }
+                    }
                     if (token.isStructStart()) {
                         parser.skipChildren();
                     }

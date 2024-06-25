@@ -51,17 +51,17 @@ public final class JsonCodec implements Codec {
         PROVIDER = selected;
     }
 
-    private final TimestampResolver timestampResolver;
-    private final JsonFieldMapper fieldMapper;
+    private final Settings settings;
     private final JsonSerdeProvider provider;
 
     private JsonCodec(Builder builder) {
-        timestampResolver = builder.useTimestampFormat
+        var timestampResolver = builder.useTimestampFormat
             ? new TimestampResolver.UseTimestampFormatTrait(builder.defaultTimestampFormat)
             : new TimestampResolver.StaticFormat(builder.defaultTimestampFormat);
-        fieldMapper = builder.useJsonName
+        var fieldMapper = builder.useJsonName
             ? new JsonFieldMapper.UseJsonNameTrait()
             : JsonFieldMapper.UseMemberName.INSTANCE;
+        settings = new Settings(timestampResolver, fieldMapper, builder.allowUnknownUnionMembers);
         provider = builder.provider == null ? PROVIDER : builder.provider;
     }
 
@@ -76,12 +76,12 @@ public final class JsonCodec implements Codec {
 
     @Override
     public ShapeSerializer createSerializer(OutputStream sink) {
-        return provider.newSerializer(sink, fieldMapper, timestampResolver);
+        return provider.newSerializer(sink, settings);
     }
 
     @Override
     public ShapeDeserializer createDeserializer(byte[] source) {
-        return provider.newDeserializer(source, fieldMapper, timestampResolver);
+        return provider.newDeserializer(source, settings);
     }
 
     public static final class Builder {
@@ -89,6 +89,7 @@ public final class JsonCodec implements Codec {
         private boolean useTimestampFormat = false;
         private TimestampFormatter defaultTimestampFormat = TimestampFormatter.Prelude.EPOCH_SECONDS;
         private JsonSerdeProvider provider;
+        private boolean allowUnknownUnionMembers;
 
         private Builder() {}
 
@@ -111,6 +112,11 @@ public final class JsonCodec implements Codec {
             return this;
         }
 
+        public Builder allowUnknownUnionMembers(boolean allow) {
+            this.allowUnknownUnionMembers = allow;
+            return this;
+        }
+
         public Builder overrideSerdeProvider(JsonSerdeProvider provider) {
             this.provider = Objects.requireNonNull(provider);
             return this;
@@ -126,4 +132,10 @@ public final class JsonCodec implements Codec {
                 '}';
         }
     }
+
+    public record Settings(
+        TimestampResolver timestampResolver,
+        JsonFieldMapper fieldMapper,
+        boolean allowUnknownUnionMembers
+    ) {}
 }

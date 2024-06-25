@@ -16,7 +16,7 @@ final class JacksonStructSerializer extends InterceptingSerializer {
     @Override
     protected ShapeSerializer before(Schema schema) {
         try {
-            parent.generator.writeFieldName(parent.fieldMapper.memberToField(schema));
+            parent.generator.writeFieldName(parent.settings.fieldMapper().memberToField(schema));
         } catch (IOException e) {
             throw new SerializationException(e);
         }

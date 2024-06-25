@@ -16,25 +16,23 @@ import java.util.function.Consumer;
 import software.amazon.smithy.java.runtime.core.schema.Schema;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
-import software.amazon.smithy.java.runtime.json.JsonFieldMapper;
+import software.amazon.smithy.java.runtime.json.JsonCodec;
 import software.amazon.smithy.java.runtime.json.TimestampResolver;
+import software.amazon.smithy.model.shapes.ShapeType;
 
 final class JsonIterDeserializer implements ShapeDeserializer {
 
     private JsonIterator iter;
-    private final TimestampResolver timestampResolver;
-    private final JsonFieldMapper fieldMapper;
+    private final JsonCodec.Settings settings;
     private final Consumer<JsonIterator> returnHandle;
 
     JsonIterDeserializer(
         JsonIterator iter,
-        TimestampResolver timestampResolver,
-        JsonFieldMapper fieldMapper,
+        JsonCodec.Settings settings,
         Consumer<JsonIterator> returnHandle
     ) {
         this.iter = iter;
-        this.timestampResolver = timestampResolver;
-        this.fieldMapper = fieldMapper;
+        this.settings = settings;
         this.returnHandle = returnHandle;
     }
 
@@ -168,7 +166,7 @@ final class JsonIterDeserializer implements ShapeDeserializer {
             if (any.valueType() == ValueType.NULL) {
                 return null;
             } else {
-                return new JsonIterDocument(any, fieldMapper, timestampResolver);
+                return new JsonIterDocument(any, settings);
             }
         } catch (Exception e) {
             throw new SerializationException(e);
@@ -178,7 +176,7 @@ final class JsonIterDeserializer implements ShapeDeserializer {
     @Override
     public Instant readTimestamp(Schema schema) {
         try {
-            var format = timestampResolver.resolve(schema);
+            var format = settings.timestampResolver().resolve(schema);
             return TimestampResolver.readTimestamp(iter.readAny(), format);
         } catch (Exception e) {
             throw new SerializationException(e);
@@ -189,8 +187,15 @@ final class JsonIterDeserializer implements ShapeDeserializer {
     public <T> void readStruct(Schema schema, T state, StructMemberConsumer<T> structMemberConsumer) {
         try {
             for (var field = iter.readObject(); field != null; field = iter.readObject()) {
-                var member = fieldMapper.fieldToMember(schema, field);
+                var member = settings.fieldMapper().fieldToMember(schema, field);
                 if (member == null) {
+                    if (schema.type() == ShapeType.UNION) {
+                        if (settings.allowUnknownUnionMembers()) {
+                            structMemberConsumer.unknownMember(state);
+                        } else {
+                            throw new SerializationException("Unknown member " + field + " encountered");
+                        }
+                    }
                     iter.skip();
                 } else {
                     structMemberConsumer.accept(state, member, this);

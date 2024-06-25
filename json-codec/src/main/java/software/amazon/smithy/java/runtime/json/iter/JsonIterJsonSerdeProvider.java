@@ -6,9 +6,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
-import software.amazon.smithy.java.runtime.json.JsonFieldMapper;
+import software.amazon.smithy.java.runtime.json.JsonCodec;
 import software.amazon.smithy.java.runtime.json.JsonSerdeProvider;
-import software.amazon.smithy.java.runtime.json.TimestampResolver;
 
 public final class JsonIterJsonSerdeProvider implements JsonSerdeProvider {
     @Override
@@ -24,10 +23,9 @@ public final class JsonIterJsonSerdeProvider implements JsonSerdeProvider {
     @Override
     public ShapeDeserializer newDeserializer(
         byte[] source,
-        JsonFieldMapper fieldMapper,
-        TimestampResolver timestampResolver
+        JsonCodec.Settings settings
     ) {
-        return new JsonIterDeserializer(JsonIterator.parse(source), timestampResolver, fieldMapper, i -> {
+        return new JsonIterDeserializer(JsonIterator.parse(source), settings, i -> {
             try {
                 i.close();
             } catch (IOException ignore) {}
@@ -37,10 +35,9 @@ public final class JsonIterJsonSerdeProvider implements JsonSerdeProvider {
     @Override
     public ShapeSerializer newSerializer(
         OutputStream sink,
-        JsonFieldMapper fieldMapper,
-        TimestampResolver timestampResolver
+        JsonCodec.Settings settings
     ) {
-        return new JsonIterSerializer(new JsonStream(sink, 1024), fieldMapper, timestampResolver, (JsonStream j) -> {
+        return new JsonIterSerializer(new JsonStream(sink, 1024), settings, (JsonStream j) -> {
             try {
                 j.close();
             } catch (IOException ignore) {}

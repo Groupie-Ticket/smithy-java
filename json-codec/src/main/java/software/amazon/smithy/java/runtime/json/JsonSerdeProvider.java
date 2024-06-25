@@ -10,8 +10,8 @@ public interface JsonSerdeProvider {
 
     String getName();
 
-    ShapeDeserializer newDeserializer(byte[] source, JsonFieldMapper fieldMapper, TimestampResolver timestampResolver);
+    ShapeDeserializer newDeserializer(byte[] source, JsonCodec.Settings settings);
 
-    ShapeSerializer newSerializer(OutputStream sink, JsonFieldMapper fieldMapper, TimestampResolver timestampResolver);
+    ShapeSerializer newSerializer(OutputStream sink, JsonCodec.Settings settings);
 
 }

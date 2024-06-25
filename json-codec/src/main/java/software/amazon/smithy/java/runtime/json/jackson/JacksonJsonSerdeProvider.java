@@ -7,9 +7,8 @@ import java.io.OutputStream;
 import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeDeserializer;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
-import software.amazon.smithy.java.runtime.json.JsonFieldMapper;
+import software.amazon.smithy.java.runtime.json.JsonCodec;
 import software.amazon.smithy.java.runtime.json.JsonSerdeProvider;
-import software.amazon.smithy.java.runtime.json.TimestampResolver;
 
 public class JacksonJsonSerdeProvider implements JsonSerdeProvider {
 
@@ -28,11 +27,10 @@ public class JacksonJsonSerdeProvider implements JsonSerdeProvider {
     @Override
     public ShapeDeserializer newDeserializer(
         byte[] source,
-        JsonFieldMapper fieldMapper,
-        TimestampResolver timestampResolver
+        JsonCodec.Settings settings
     ) {
         try {
-            return new JacksonJsonDeserializer(FACTORY.createParser(source), fieldMapper, timestampResolver);
+            return new JacksonJsonDeserializer(FACTORY.createParser(source), settings);
         } catch (IOException e) {
             throw new SerializationException(e);
         }
@@ -41,11 +39,10 @@ public class JacksonJsonSerdeProvider implements JsonSerdeProvider {
     @Override
     public ShapeSerializer newSerializer(
         OutputStream sink,
-        JsonFieldMapper fieldMapper,
-        TimestampResolver timestampResolver
+        JsonCodec.Settings settings
     ) {
         try {
-            return new JacksonJsonSerializer(FACTORY.createGenerator(sink), fieldMapper, timestampResolver);
+            return new JacksonJsonSerializer(FACTORY.createGenerator(sink), settings);
         } catch (IOException e) {
             throw new SerializationException(e);
         }
