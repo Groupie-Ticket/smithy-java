@@ -72,7 +72,11 @@ public final class RestJsonProtocol extends ServerProtocol {
             );
         }
         matcher = builder.build();
-        this.codec = JsonCodec.builder().useJsonName(true).useTimestampFormat(true).build();
+        this.codec = JsonCodec.builder()
+            .useJsonName(true)
+            .useTimestampFormat(true)
+            .allowUnknownUnionMembers(false)
+            .build();
     }
 
     @Override

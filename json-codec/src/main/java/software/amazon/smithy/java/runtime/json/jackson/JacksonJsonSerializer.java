@@ -19,24 +19,20 @@ import software.amazon.smithy.java.runtime.core.serde.SerializationException;
 import software.amazon.smithy.java.runtime.core.serde.ShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.SpecificShapeSerializer;
 import software.amazon.smithy.java.runtime.core.serde.document.Document;
-import software.amazon.smithy.java.runtime.json.JsonFieldMapper;
-import software.amazon.smithy.java.runtime.json.TimestampResolver;
+import software.amazon.smithy.java.runtime.json.JsonCodec;
 import software.amazon.smithy.model.shapes.ShapeType;
 
 final class JacksonJsonSerializer implements ShapeSerializer {
 
     JsonGenerator generator;
-    final JsonFieldMapper fieldMapper;
-    final TimestampResolver timestampResolver;
+    final JsonCodec.Settings settings;
 
     JacksonJsonSerializer(
         JsonGenerator generator,
-        JsonFieldMapper fieldMapper,
-        TimestampResolver timestampResolver
+        JsonCodec.Settings settings
     ) {
         this.generator = generator;
-        this.timestampResolver = timestampResolver;
-        this.fieldMapper = fieldMapper;
+        this.settings = settings;
     }
 
     @Override
@@ -189,7 +185,7 @@ final class JacksonJsonSerializer implements ShapeSerializer {
 
     @Override
     public void writeTimestamp(Schema schema, Instant value) {
-        timestampResolver.resolve(schema).writeToSerializer(schema, value, this);
+        settings.timestampResolver().resolve(schema).writeToSerializer(schema, value, this);
     }
 
     @Override
