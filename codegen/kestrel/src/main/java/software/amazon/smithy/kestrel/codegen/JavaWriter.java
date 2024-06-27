@@ -19,7 +19,7 @@ public final class JavaWriter extends SymbolWriter<JavaWriter, JavaImportContain
     private boolean plainFile;
 
     public JavaWriter(KestrelSettings settings, String packageName) {
-        super(new JavaImportContainer(packageName));
+        super(new JavaImportContainer(packageName, settings.getHeader()));
         this.settings = settings;
         this.packageName = packageName;
         trimBlankLines();

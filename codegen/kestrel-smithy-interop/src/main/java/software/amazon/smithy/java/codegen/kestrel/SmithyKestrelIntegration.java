@@ -71,10 +71,6 @@ public class SmithyKestrelIntegration implements KestrelIntegration {
             var generator = section.generator();
             var symbol = generator.getSymbol();
             var smithySymbol = symbol.expectProperty(SMITHY_SYMBOL);
-//            if (generator.getShape().hasTrait(StreamingTrait.class)) {
-//                writer.write("public final class $L implements $T {", symbol.getName(), CommonSymbols.KestrelObject);
-//                return;
-//            }
 
             writer.write(
                 """

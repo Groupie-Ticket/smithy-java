@@ -41,6 +41,13 @@ public final class CodegenRunner {
                     ObjectNode.builder()
                         .withMember("service", service)
                         .withMember("namespace", service.split("#")[0])
+                        .withMember("headerString", """
+                            /*\s
+                             * Copyright 2024 Amazon.com, Inc. or its affiliates. All rights reserved.\s
+                             *\s
+                             * AMAZON PROPRIETARY/CONFIDENTIAL\s
+                             */
+                            """)
                         .withMember("useInstantForTimestamp", true)
                         .build()
                 )

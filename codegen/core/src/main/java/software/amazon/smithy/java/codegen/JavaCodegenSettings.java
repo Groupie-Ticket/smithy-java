@@ -6,7 +6,6 @@
 package software.amazon.smithy.java.codegen;
 
 import java.io.File;
-import java.util.List;
 import java.util.Objects;
 import software.amazon.smithy.codegen.core.CodegenException;
 import software.amazon.smithy.model.node.ObjectNode;
@@ -24,15 +23,16 @@ public final class JavaCodegenSettings {
     private static final String SERVICE = "service";
     private static final String NAMESPACE = "namespace";
     private static final String HEADER_FILE = "headerFile";
+    private static final String HEADER_STRING = "headerString";
 
     private final ShapeId service;
     private final String packageNamespace;
     private final String header;
 
-    JavaCodegenSettings(ShapeId service, String packageNamespace, String headerFile, String sourceLocation) {
+    JavaCodegenSettings(ShapeId service, String packageNamespace, String header) {
         this.service = Objects.requireNonNull(service);
         this.packageNamespace = Objects.requireNonNull(packageNamespace);
-        this.header = getHeader(headerFile, Objects.requireNonNull(sourceLocation));
+        this.header = header;
     }
 
     /**
@@ -42,12 +42,19 @@ public final class JavaCodegenSettings {
      * @return Parsed settings
      */
     public static JavaCodegenSettings fromNode(ObjectNode settingsNode) {
-        settingsNode.warnIfAdditionalProperties(List.of(SERVICE, NAMESPACE, HEADER_FILE));
+//        settingsNode.warnIfAdditionalProperties(List.of(SERVICE, NAMESPACE, HEADER_FILE));
+        String headerString = settingsNode.getStringMemberOrDefault(HEADER_STRING, null);
+        if (headerString == null) {
+            headerString = getHeader(
+                settingsNode.getStringMemberOrDefault(HEADER_FILE, null),
+                settingsNode.getSourceLocation().getFilename()
+            );
+        }
+
         return new JavaCodegenSettings(
             settingsNode.expectStringMember(SERVICE).expectShapeId(),
             settingsNode.expectStringMember(NAMESPACE).getValue(),
-            settingsNode.getStringMemberOrDefault(HEADER_FILE, null),
-            settingsNode.getSourceLocation().getFilename()
+            headerString
         );
     }
 

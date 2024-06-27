@@ -16,6 +16,7 @@ import software.amazon.smithy.codegen.core.SymbolReference;
 final class JavaImportContainer implements ImportContainer {
 
     private final String packageName;
+    private final String header;
     private final Map<String, Symbol> aliasesToSymbol = new HashMap<>();
     private final Map<Symbol, String> symbolsToAlias = new TreeMap<>(
         Comparator.comparing(Symbol::getNamespace).thenComparing(Symbol::getName)
@@ -27,8 +28,9 @@ final class JavaImportContainer implements ImportContainer {
     );
 
 
-    JavaImportContainer(String packageName) {
+    JavaImportContainer(String packageName, String header) {
         this.packageName = packageName;
+        this.header = header;
     }
 
     @Override
@@ -91,7 +93,13 @@ final class JavaImportContainer implements ImportContainer {
 
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder("package ")
+        StringBuilder sb = new StringBuilder();
+        if (header != null) {
+            sb.append(header);
+            sb.append('\n');
+        }
+
+        sb.append("package ")
             .append(packageName)
             .append(";\n\n");
 
