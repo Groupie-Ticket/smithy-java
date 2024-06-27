@@ -13,6 +13,7 @@ import com.amazon.hyperloop.streaming.model.EdgeSubscriptionChange;
 import com.amazon.hyperloop.streaming.model.EdgeSubscriptionChangeType;
 import com.amazon.hyperloop.streaming.model.EdgeSubscriptionChanges;
 import com.amazon.hyperloop.streaming.model.PollEdgeSubscriptions;
+import com.amazon.hyperloop.streaming.model.ValidationException;
 import com.amazonaws.autoloop.mockserver.processing.EdgeEventProcessor;
 import java.time.Instant;
 import java.util.Arrays;
@@ -369,13 +370,13 @@ public final class EdgeEventProcessorImpl extends EdgeEventProcessor {
 
     <T> void assertTrueOrThrow(boolean expression, String message) {
         if (!expression) {
-            throw new WrongResultException(message);
+            throw ValidationException.builder().message(message).build();
         }
     }
 
     <T> void assertOrThrow(T expected, T actual, String message) {
         if (!actual.equals(expected)) {
-            throw new WrongResultException(message);
+            throw ValidationException.builder().message(message).build();
         }
     }
 }

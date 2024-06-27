@@ -153,10 +153,12 @@ public class AutoloopServer {
                     return Flowable.just(
                         edgeEventProcessor.process(event.getValue(), createAttributeSyncStreamInput)
                     );
-                } catch (UnsupportedOperationException | IllegalStateException e) {
+                }
+                catch(ValidationException e){
+                    return Flowable.error(ValidationException.builder().message(e.getMessage()).build());
+                }
+                catch (UnsupportedOperationException | IllegalStateException e) {
                     return Flowable.error(InternalServerException.builder().message(e.getMessage()).build());
-                } catch (Exception ex) {
-                    return Flowable.error(ValidationException.builder().message(ex.getMessage()).build());
                 }
             }
 
