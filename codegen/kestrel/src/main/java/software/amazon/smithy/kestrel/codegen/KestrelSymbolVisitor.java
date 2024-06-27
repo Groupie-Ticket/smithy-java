@@ -12,15 +12,7 @@ import software.amazon.smithy.codegen.core.ReservedWordsBuilder;
 import software.amazon.smithy.codegen.core.Symbol;
 import software.amazon.smithy.codegen.core.SymbolProvider;
 import software.amazon.smithy.codegen.core.SymbolReference;
-import software.amazon.smithy.java.kestrel.BooleanMap;
-import software.amazon.smithy.java.kestrel.ByteMap;
-import software.amazon.smithy.java.kestrel.DoubleMap;
-import software.amazon.smithy.java.kestrel.FloatMap;
-import software.amazon.smithy.java.kestrel.IntegerMap;
-import software.amazon.smithy.java.kestrel.LongMap;
-import software.amazon.smithy.java.kestrel.ShortMap;
-import software.amazon.smithy.java.kestrel.StringMap;
-import software.amazon.smithy.java.kestrel.StructureMap;
+import software.amazon.smithy.java.kestrel.*;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.BigDecimalShape;
 import software.amazon.smithy.model.shapes.BigIntegerShape;
@@ -47,6 +39,7 @@ import software.amazon.smithy.model.shapes.StringShape;
 import software.amazon.smithy.model.shapes.StructureShape;
 import software.amazon.smithy.model.shapes.TimestampShape;
 import software.amazon.smithy.model.shapes.UnionShape;
+import software.amazon.smithy.model.traits.SparseTrait;
 import software.amazon.smithy.model.traits.UniqueItemsTrait;
 import software.amazon.smithy.utils.StringUtils;
 
@@ -147,7 +140,9 @@ public class KestrelSymbolVisitor implements SymbolProvider, ShapeVisitor<Symbol
             case LONG -> LongMap.class;
             case FLOAT -> FloatMap.class;
             case DOUBLE -> DoubleMap.class;
-            case MAP, LIST, STRUCTURE, UNION -> StructureMap.class;
+            case MAP, LIST, STRUCTURE, UNION -> shape.hasTrait(SparseTrait.class)
+                ? SparseStructureMap.class
+                : StructureMap.class;
             default -> throw new IllegalArgumentException(
                 model.expectShape(shape.getValue().getTarget())
                     .getType()
