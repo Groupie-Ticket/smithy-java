@@ -60,14 +60,14 @@ public class EdgeEventProcessor {
         AttributeUpdates attributeUpdates,
         CreateAttributeSyncStreamInput createAttributeSyncStreamInput
     ) {
-        throw new UnsupportedOperationException("Unimplemented method 'handlePollEdgeSubscriptions'");
+        throw new UnsupportedOperationException("Unimplemented method 'processAttributeUpdates'");
     }
 
     protected CloudEvent processPollEdgeSubscriptions(
         PollEdgeSubscriptions pollEdgeSubscriptions,
         CreateAttributeSyncStreamInput createAttributeSyncStreamInput
     ) {
-        throw new UnsupportedOperationException("Unimplemented method 'handlePollEdgeSubscriptions'");
+        throw new UnsupportedOperationException("Unimplemented method 'processPollEdgeSubscriptions'");
     }
 
     protected CloudEvent processPollAttributeUpdates(

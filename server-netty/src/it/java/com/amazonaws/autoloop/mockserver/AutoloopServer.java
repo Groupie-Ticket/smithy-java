@@ -17,9 +17,12 @@ import io.reactivex.rxjava3.core.Flowable;
 import io.reactivex.rxjava3.core.Notification;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import java.net.URI;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicReference;
+import software.amazon.smithy.java.runtime.core.schema.ValidationError;
+import software.amazon.smithy.java.runtime.core.schema.Validator;
 import software.amazon.smithy.java.server.RequestContext;
 import software.amazon.smithy.java.server.Server;
 
@@ -37,7 +40,6 @@ public class AutoloopServer {
             edgeEventProcessor,
             createAttributeSyncStreamValidator
         );
-
         server = Server.builder(uri)
             .addService(
                 Autoloop.builder()
@@ -93,6 +95,7 @@ public class AutoloopServer {
             private final AtomicReference<Flow.Subscription> upstream = new AtomicReference<>();
             private final EdgeEventProcessor edgeEventProcessor;
             private final CreateAttributeSyncStreamInput createAttributeSyncStreamInput;
+            private final Validator validator;
 
             public CreateAttributeSyncStreamProcessor(
                 EdgeEventProcessor edgeEventProcessor,
@@ -100,6 +103,7 @@ public class AutoloopServer {
             ) {
                 this.edgeEventProcessor = edgeEventProcessor;
                 this.createAttributeSyncStreamInput = createAttributeSyncStreamInput;
+                this.validator = Validator.builder().build();
             }
 
             public Flowable<CloudEvent> getFlowable(Notification<EdgeEvent> event) {
@@ -108,12 +112,23 @@ public class AutoloopServer {
                 } else if (event.isOnError()) {
                     return Flowable.error(event.getError());
                 }
+                List<ValidationError> validationErrors = validator.validate(event.getValue());
+                
+                if (!validationErrors.isEmpty()) {
+                    return Flowable.error(
+                    ValidationException.builder()
+                            .message("Validation errors found: " + Arrays.toString(validationErrors.toArray()))
+                            .build()
+                    );
+                }
                 try {
                     return Flowable.just(
-                            edgeEventProcessor.process(event.getValue(), createAttributeSyncStreamInput)
+                        edgeEventProcessor.process(event.getValue(), createAttributeSyncStreamInput)
                     );
                 } catch (UnsupportedOperationException | IllegalStateException e) {
                     return Flowable.error(InternalServerException.builder().message(e.getMessage()).build());
+                } catch (Exception ex) {
+                    return Flowable.error(ValidationException.builder().message(ex.getMessage()).build());
                 }
             }
 
