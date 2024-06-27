@@ -131,11 +131,7 @@ final class RequestBodyPublisher implements Flow.Publisher<ByteBuffer> {
             byte[] copy = new byte[buf.readableBytes()];
             buf.readBytes(copy);
             buf.release();
-            queue.add(ByteBuffer.wrap(copy));
-            if (pendingWrites.getAndIncrement() == 0 && requestBodySubscriber != null) {
-                // sub is only safe to access under the lock, so pass it in
-                downstreamExecutor.execute(() -> flushWrites(requestBodySubscriber));
-            }
+            enqueue(ByteBuffer.wrap(copy), requestBodySubscriber);
             if (swallowStart != null && !maxSwallowDuration.isNegative() && !maxSwallowDuration.isZero() &&
                 clock.get().isAfter(swallowStart.plus(maxSwallowDuration))) {
                 pendingReads = 0;
@@ -155,9 +151,18 @@ final class RequestBodyPublisher implements Flow.Publisher<ByteBuffer> {
             try {
                 for (int i = 0; i < toWrite; i++) {
                     var event = queue.poll();
+                    if (event == null) {
+                        return;
+                    }
+
                     written--;
                     if (event instanceof ByteBuffer buf) {
                         sub.onNext(buf);
+                    } else if (event instanceof Throwable t) {
+                        sub.onError(t);
+                        queue.clear();
+                        pendingWrites.set(0);
+                        written = 0;
                     } else {
                         ByteBuffer buf = ((Complete) event).buf;
                         if (buf.hasRemaining()) {
@@ -168,8 +173,18 @@ final class RequestBodyPublisher implements Flow.Publisher<ByteBuffer> {
                     }
                 }
             } finally {
-                toWrite = pendingWrites.addAndGet(written);
+                if (written != 0) {
+                    toWrite = pendingWrites.addAndGet(written);
+                }
             }
+        }
+    }
+
+    private void enqueue(Object o, Flow.Subscriber<? super ByteBuffer> requestBodySubscriber) {
+        queue.add(o);
+        if (pendingWrites.getAndIncrement() == 0 && requestBodySubscriber != null) {
+            // sub is only safe to access under the lock, so pass it in
+            downstreamExecutor.execute(() -> flushWrites(requestBodySubscriber));
         }
     }
 
@@ -178,10 +193,7 @@ final class RequestBodyPublisher implements Flow.Publisher<ByteBuffer> {
             byte[] copy = new byte[buf.readableBytes()];
             buf.readBytes(copy);
             buf.release();
-            queue.add(new Complete(ByteBuffer.wrap(copy)));
-            if (pendingWrites.getAndIncrement() == 0 && requestBodySubscriber != null) {
-                downstreamExecutor.execute(() -> flushWrites(requestBodySubscriber));
-            }
+            enqueue(new Complete(ByteBuffer.wrap(copy)), requestBodySubscriber);
         }
     }
 
@@ -194,9 +206,7 @@ final class RequestBodyPublisher implements Flow.Publisher<ByteBuffer> {
             closedException = throwable;
             if (requestBodySubscriber != null) {
                 var sub = requestBodySubscriber;
-                downstreamExecutor.execute(() -> {
-                    sub.onError(throwable);
-                });
+                enqueue(throwable, sub);
                 requestBodySubscriber = null;
             }
             swallowRemainingRequestData();
