@@ -9,8 +9,8 @@ public final class CreateAttributeSyncStreamValidatorImpl extends CreateAttribut
 
     @Override
     public void validate(CreateAttributeSyncStreamInput input) {
-        if (input.objectId().length() < 5) {
-            throw ValidationException.builder().message("Object ID too short: " + input.objectId()).build();
+        if (input.dataSyncEngineIdentifier().equals("invalid")) {
+            throw ValidationException.builder().message("Invalid datasync engine identifier received").build();
         }
     }
 }
