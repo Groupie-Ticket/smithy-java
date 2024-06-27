@@ -115,11 +115,39 @@ public class AutoloopServer {
                 List<ValidationError> validationErrors = validator.validate(event.getValue());
                 
                 if (!validationErrors.isEmpty()) {
-                    return Flowable.error(
-                    ValidationException.builder()
-                            .message("Validation errors found: " + Arrays.toString(validationErrors.toArray()))
-                            .build()
-                    );
+
+                    /*
+                     * issue in validator
+                     * 
+                     * the following model elements are used in Autoloop model
+
+                            @length(min: 1, max: 100)
+                            @pattern("^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
+                            string AttributeName
+
+                            @length(min: 1, max: 50)
+                            map AttributeValueUpdates {
+                                @documentation("The attributeName as key for the value updates")
+                                key: AttributeName,
+                                value: AttributeValueUpdate
+                            }
+
+                    *
+                    *  Validator fails for AttributeValueUpdates key. For some reasons it expects a structure but just finds a string.
+                    *  Since AttributeName is supposed to be a string (just with a regexp match), a string should be the correct type to pass.
+                    */
+
+
+                    // TODO: remove this false positive check, once the validator is fixed
+                    boolean falsePositive = validationErrors.size() == 1 && validationErrors.get(0).message().contains("Value must be structure, but found string")
+                        && validationErrors.get(0).path().contains("SdkSchema{id='com.amazon.hyperloop.streaming#EdgeEvent$AttributeUpdates', type=structure}/attributes");
+                    if(!falsePositive){
+                        return Flowable.error(
+                            ValidationException.builder()
+                                    .message("Validation errors found: " + Arrays.toString(validationErrors.toArray()))
+                                    .build()
+                            );
+                    }
                 }
                 try {
                     return Flowable.just(
