@@ -7,11 +7,11 @@ use aws.auth#sigv4
 use aws.protocols#restJson1
 use smithy.protocols#idx
 use smithy.protocols#indexed
-use smithy.protocols#rpcv2Kestrel
+use smithy.protocols#rpcv2Sparrowhawk
 
 @sigv4(name: "restjson")
 @restJson1
-@rpcv2Kestrel
+@rpcv2Sparrowhawk
 @indexed
 service TestService {
     version: "today"

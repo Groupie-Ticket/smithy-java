@@ -33,7 +33,7 @@ extra["moduleName"] = "software.amazon.smithy.java.vend.server"
 dependencies {
     implementation(project(":server-netty"))
     implementation(project(":server-protocols:restJson"))
-    implementation(project(":server-protocols:rpcV2Kestrel"))
+    implementation(project(":server-protocols:rpcV2Sparrowhawk"))
     implementation(project(":core"))
 }
 
