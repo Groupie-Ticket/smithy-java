@@ -10,6 +10,7 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 import software.amazon.smithy.java.runtime.core.Context;
@@ -51,8 +52,12 @@ final class RpcV2SparrowhawkProtocol extends ServerProtocol {
 
     RpcV2SparrowhawkProtocol(Service service) {
         super(service);
-        this.sparrowhawkCodecFactory = SparrowhawkCodecFactoryIndex.getCodecFactory(
-            service.getSchema().getId().toString()
+        var serviceId = service.getSchema().getId().toString();
+        this.sparrowhawkCodecFactory = Objects.requireNonNull(
+            SparrowhawkCodecFactoryIndex.getCodecFactory(
+                serviceId
+            ),
+            "Couldn't find a CodecFactory for service " + serviceId
         );
         this.sigv4 = service.getSchema().getAwsAuthModes().contains(ShapeId.from("aws.auth#sigv4"));
     }
