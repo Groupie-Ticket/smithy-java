@@ -71,6 +71,14 @@ public final class JsonCodec implements Codec {
         provider = builder.provider == null ? PROVIDER : builder.provider;
     }
 
+    public static JsonCodec create() {
+        return new Builder().build();
+    }
+
+    public static JsonCodec createWithBindings() {
+        return new Builder().useJsonName(true).build();
+    }
+
     public static Builder builder() {
         return new Builder();
     }
