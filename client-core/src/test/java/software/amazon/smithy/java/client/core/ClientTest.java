@@ -8,12 +8,14 @@ package software.amazon.smithy.java.client.core;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.instanceOf;
 
 import java.net.URI;
 import java.net.URISyntaxException;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.java.aws.client.restjson.RestJsonClientProtocol;
 import software.amazon.smithy.java.client.core.endpoint.EndpointResolver;
+import software.amazon.smithy.java.client.core.plugins.ApplyDefaultRetryStrategyPlugin;
 import software.amazon.smithy.java.client.core.plugins.ApplyModelRetryInfoPlugin;
 import software.amazon.smithy.java.client.core.plugins.DefaultPlugin;
 import software.amazon.smithy.java.client.core.plugins.InjectIdempotencyTokenPlugin;
@@ -22,6 +24,7 @@ import software.amazon.smithy.java.client.http.JavaHttpClientTransport;
 import software.amazon.smithy.java.client.http.plugins.ApplyHttpRetryInfoPlugin;
 import software.amazon.smithy.java.client.http.plugins.UserAgentPlugin;
 import software.amazon.smithy.java.dynamicclient.DynamicClient;
+import software.amazon.smithy.java.retries.sdkadapter.SdkRetryStrategy;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.ShapeId;
 
@@ -60,6 +63,7 @@ public class ClientTest {
                 // DefaultPlugin applies these two:
                 ApplyModelRetryInfoPlugin.class,
                 InjectIdempotencyTokenPlugin.class,
+                ApplyDefaultRetryStrategyPlugin.class,
                 // The transport is applied as a plugin, before user plugins.
                 JavaHttpClientTransport.class,
                 // The transport automatically forwards plugin application to the HttpMessageExchange.
@@ -76,5 +80,18 @@ public class ClientTest {
     private static final class FooPlugin implements ClientPlugin {
         @Override
         public void configureClient(ClientConfig.Builder config) {}
+    }
+
+    @Test
+    public void usesSdkRetriesIfAvailable() throws URISyntaxException {
+        DynamicClient c = DynamicClient.builder()
+            .model(MODEL)
+            .service(SERVICE)
+            .protocol(new RestJsonClientProtocol(SERVICE))
+            .addPlugin(new FooPlugin())
+            .endpointResolver(EndpointResolver.staticEndpoint(new URI("http://localhost")))
+            .build();
+
+        assertThat(c.config().retryStrategy(), instanceOf(SdkRetryStrategy.class));
     }
 }

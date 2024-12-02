@@ -23,5 +23,6 @@ public final class DefaultPlugin implements ClientPlugin {
     public void configureClient(ClientConfig.Builder config) {
         config.applyPlugin(ApplyModelRetryInfoPlugin.INSTANCE);
         config.applyPlugin(InjectIdempotencyTokenPlugin.INSTANCE);
+        config.applyPlugin(ApplyDefaultRetryStrategyPlugin.INSTANCE);
     }
 }

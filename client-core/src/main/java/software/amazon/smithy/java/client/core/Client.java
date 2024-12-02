@@ -7,6 +7,7 @@ package software.amazon.smithy.java.client.core;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import software.amazon.smithy.java.client.core.auth.identity.IdentityResolver;
@@ -54,15 +55,8 @@ public abstract class Client {
         this.interceptor = ClientInterceptor.chain(config.interceptors());
 
         this.identityResolvers = IdentityResolvers.of(config.identityResolvers());
-
         this.typeRegistry = TypeRegistry.builder().build();
-
-        if (config.retryStrategy() != null) {
-            this.retryStrategy = config.retryStrategy();
-        } else {
-            // TODO: Pick a better default retry strategy.
-            this.retryStrategy = RetryStrategy.noRetries();
-        }
+        this.retryStrategy = Objects.requireNonNullElse(config.retryStrategy(), RetryStrategy.noRetries());
     }
 
     /**

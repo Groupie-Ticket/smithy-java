@@ -16,4 +16,6 @@ dependencies {
 
     testImplementation(project(":dynamic-client"))
     testImplementation(project(":aws:client-restjson"))
+    testImplementation(project(":retries-sdk-adapter"))
+    testImplementation(libs.aws.sdk.retries)
 }
