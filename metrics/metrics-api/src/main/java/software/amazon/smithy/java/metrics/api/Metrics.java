@@ -127,18 +127,13 @@ public interface Metrics extends AutoCloseable {
     void addDate(String name, double value);
 
     /**
-     * Increment a count primitive based on a boolean value.
-     *
-     * <p>Values of <code>true</code> are converted to <code>1.0</code> and values of <code>false</code> are converted
-     * to <code>0.0</code>. If the named count does not exist, it will be set to the converted <em>value</em>. The
-     * unit of the counter is set to the dimensionless unit (i.e., {@link Unit#ONE}).
+     * Increment a count primitive by 1.
      *
      * @param name count name
-     * @param value count value. Converted to a double of 1.0 if the boolean is true and 0.0 if the boolean is false.
      * @see #addCount(String, double, String, int)
      */
-    default void addCount(String name, boolean value) {
-        addCount(name, value ? 1.0 : 0.0, Unit.ONE, 1);
+    default void addCount(String name) {
+        addCount(name, 1.0, Unit.ONE, 1);
     }
 
     /**
