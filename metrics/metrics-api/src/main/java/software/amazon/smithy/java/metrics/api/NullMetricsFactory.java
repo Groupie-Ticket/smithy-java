@@ -11,6 +11,11 @@ package software.amazon.smithy.java.metrics.api;
 public final class NullMetricsFactory implements MetricsFactory {
     @Override
     public Metrics newMetrics() {
-        return new NullMetrics(this);
+        return newSpan(null);
+    }
+
+    @Override
+    public Metrics newSpan(String span) {
+        return new NullMetrics();
     }
 }
