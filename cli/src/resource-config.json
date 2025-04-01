@@ -1,7 +1,12 @@
 {
   "resources": {
     "includes": [
-      {"pattern": ".*\\.smithy$"}
+      {"pattern": ".*\\.smithy$"},
+      {"pattern": ".*/META-INF/.*"},
+      {
+        "pattern": "software.amazon.smithy.protocol.traits:.*/META-INF/.*"
+      },
+      {"pattern": ".*/*"}
     ]
   }
 }

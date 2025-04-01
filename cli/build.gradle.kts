@@ -20,6 +20,9 @@ dependencies {
     implementation(project(":aws:client:aws-client-core"))
     implementation(project(":aws:sigv4"))
 
+    implementation("software.amazon.smithy:smithy-aws-traits:1.56.0")
+    implementation("software.amazon.smithy:smithy-protocol-traits:1.56.0")
+
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.8.1")
     testImplementation("org.junit.jupiter:junit-jupiter-engine:5.8.1")
     testImplementation("org.junit.jupiter:junit-jupiter-params:5.8.1")
@@ -52,7 +55,9 @@ graalvmNative {
 
         buildArgs.addAll(listOf(
             "-H:ResourceConfigurationFiles=${projectDir}/src/resource-config.json",
-            "--enable-url-protocols=http,https",
+            "-H:Log=registerResource:5",
+            "-H:+UnlockExperimentalVMOptions",
+            "--enable-url-protocols=http,https"
         ))
 
         // Debug info
@@ -65,6 +70,42 @@ graalvmNative {
         // Determines if image is a shared library [note: defaults to true if java-library plugin is applied]
         sharedLibrary.set(false)
     }
+
+    agent {
+        enabled.set(true)
+        defaultMode.set("standard")
+    }
+
+//    agent {
+//        defaultMode.set("standard")
+//        enabled.set(true)
+//
+//        modes {
+//            standard {
+//            }
+//            conditional {
+////                userCodeFilterPath.set("path-to-filter.json")
+//            }
+//            direct {
+////                options.add("config-output-dir={./src}")
+////                options.add("experimental-configuration-with-origins")
+//            }
+//        }
+//
+////        callerFilterFiles.from("filter.json")
+////        accessFilterFiles.from("filter.json")
+//        builtinCallerFilter.set(true)
+//        builtinHeuristicFilter.set(true)
+//        enableExperimentalPredefinedClasses.set(false)
+//        enableExperimentalUnsafeAllocationTracing.set(false)
+//        trackReflectionMetadata.set(true)
+//
+//        metadataCopy {
+//            inputTaskNames.add("test")
+//            outputDirectories.add("/META-INF/native-image/<groupId>/<artifactId>/")
+//            mergeWithExisting.set(true)
+//        }
+//    }
 }
 
 repositories {

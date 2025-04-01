@@ -48,12 +48,12 @@ public final class SmithyCall implements Callable<Integer> {
     private static final JsonCodec CODEC = JsonCodec.builder().build();
     private static final Logger LOGGER = Logger.getLogger(SmithyCall.class.getName());
 
-    private static final String[] BASE_RESOURCE_FILES = {
-            "aws.api.smithy",
-            "aws.auth.smithy",
-            "aws.customizations.smithy",
-            "aws.protocols.smithy"
-    };
+//    private static final String[] BASE_RESOURCE_FILES = {
+//            "aws.api.smithy",
+//            "aws.auth.smithy",
+//            "aws.customizations.smithy",
+//            "aws.protocols.smithy"
+//    };
 
     @Parameters(index = "0", description = "Service Name")
     private String service;
@@ -184,21 +184,20 @@ public final class SmithyCall implements Callable<Integer> {
         var assembler = Model.assembler();
 
         // Add base resource files
-        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-        for (String smithyFile : BASE_RESOURCE_FILES) {
-            URL resourceUrl = classLoader.getResource(smithyFile);
-            if (resourceUrl != null) {
-                assembler.addImport(resourceUrl);
-            } else {
-                LOGGER.log(Level.SEVERE, "Resource not found: " + smithyFile, new NoSuchFileException(smithyFile));
-            }
-        }
-
+//        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+//        for (String smithyFile : BASE_RESOURCE_FILES) {
+//            URL resourceUrl = classLoader.getResource(smithyFile);
+//            if (resourceUrl != null) {
+//                assembler.addImport(resourceUrl);
+//            } else {
+//                LOGGER.log(Level.SEVERE, "Resource not found: " + smithyFile, new NoSuchFileException(smithyFile));
+//            }
+//        }
         // Add model files
         for (String path : directoryPath) {
             assembler.addImport(path);
         }
-        return assembler.assemble().unwrap();
+        return assembler.discoverModels().assemble().unwrap();
     }
 
     private DynamicClient buildDynamicClient(Model model, ShapeId serviceInput) {
